@@ -6,7 +6,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "vite build && node scripts/copy-electron.cjs",
+    "build": "vite build --base=./ && node scripts/copy-electron.cjs",
     "pack:from-release": "node scripts/package-from-release.cjs",
     "start": "electron .",
     "start:diagnostic": "electron . --no-sandbox",

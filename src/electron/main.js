@@ -371,6 +371,29 @@ if (!electron_1.app.requestSingleInstanceLock()) {
     win.webContents.on("render-process-gone", (_event, details) =>
       console.error("Renderer gone", details),
     );
+    win.webContents.on(
+      "did-fail-load",
+      (_event, errorCode, errorDescription, validatedURL, isMainFrame) =>
+        console.error("Renderer load failed", {
+          errorCode,
+          errorDescription,
+          validatedURL,
+          isMainFrame,
+        }),
+    );
+    win.webContents.on(
+      "console-message",
+      (_event, level, message, line, sourceId) =>
+        console.log("Renderer console", {
+          level,
+          message,
+          line,
+          sourceId,
+        }),
+    );
+    win.webContents.on("dom-ready", () =>
+      console.log("Renderer DOM ready", win.webContents.getURL()),
+    );
     ensureTray();
     await win.loadFile(
       node_path_1.default.join(__dirname, "../dist/index.html"),
