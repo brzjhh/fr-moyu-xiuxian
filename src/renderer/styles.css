@@ -821,82 +821,33 @@ svg {
 .cultivator {
   overflow: visible;
 }
+.cultivator image {
+  image-rendering: pixelated;
+}
 .cultivator .character-body {
-  transform-origin: 150px 275px;
+  transform-origin: 150px 292px;
   animation: breathe 3.8s ease-in-out infinite;
 }
-.cultivator .head {
-  transform-origin: 150px 153px;
-  animation: head-sway 5s ease-in-out infinite;
-}
-.cultivator .ribbon {
-  transform-origin: 175px 95px;
-  animation: ribbon-sway 3.3s ease-in-out infinite;
-}
-.cultivator .motes {
-  animation: mote-glow 3.2s ease-in-out infinite;
-}
-.cultivator .eyes-open {
-  transform-origin: 150px 138px;
-  animation: blink 5.7s infinite;
-}
-.eyes-closed,
-.crossed-legs,
 .meditation-aura,
 .alchemy-prop,
-.flying-sword,
-.activity-meditate .eyes-open,
-.activity-meditate .leg {
+.flying-sword {
   display: none;
 }
-.activity-meditate .eyes-closed,
-.activity-meditate .crossed-legs,
 .activity-meditate .meditation-aura {
   display: inline;
 }
 .activity-meditate .character-body {
   animation: meditate-float 4s ease-in-out infinite;
 }
-.activity-meditate .head {
-  animation: none;
-}
 .activity-meditate .meditation-aura {
   transform-origin: 150px 260px;
   animation: aura-pulse 4s ease-in-out infinite;
 }
-.activity-meditate .arm-left {
-  transform-origin: 120px 181px;
-  transform: rotate(-18deg);
-}
-.activity-meditate .arm-right {
-  transform-origin: 178px 181px;
-  transform: rotate(18deg);
-}
 .activity-walk .character-body {
   animation: walk-bob 0.7s ease-in-out infinite;
 }
-.activity-walk .leg-left {
-  transform-origin: 134px 242px;
-  animation: step-left 0.7s ease-in-out infinite;
-}
-.activity-walk .leg-right {
-  transform-origin: 173px 242px;
-  animation: step-right 0.7s ease-in-out infinite;
-}
-.activity-walk .arm-left {
-  transform-origin: 122px 179px;
-  animation: step-right 0.7s ease-in-out infinite;
-}
-.activity-walk .arm-right {
-  transform-origin: 177px 179px;
-  animation: step-left 0.7s ease-in-out infinite;
-}
 .activity-alchemy .alchemy-prop {
   display: inline;
-}
-.activity-alchemy .arm-right {
-  transform-origin: 177px 180px;
-  animation: brew-hand 2s ease-in-out infinite;
 }
 .activity-alchemy .brew-steam {
   animation: steam-rise 2.8s ease-in-out infinite;
@@ -908,28 +859,15 @@ svg {
   display: inline;
   animation: sword-float 3s ease-in-out infinite;
 }
-.activity-sword .sheathed-sword,
-.activity-meditate .sheathed-sword {
-  display: none;
-}
 .activity-sword .character-body {
   animation: sword-rider 3s ease-in-out infinite;
 }
 .activity-sword .ground-shadow {
   opacity: 0.06;
 }
-.activity-sword .ribbon {
-  animation: ribbon-flight 1.3s ease-in-out infinite;
-}
-.activity-sword .sword-trail {
-  animation: mote-glow 1.3s ease-in-out infinite;
-}
 .is-paused,
 .is-paused * {
   animation-play-state: paused !important;
-}
-.is-paused .eyes-open {
-  transform: scaleY(1);
 }
 @keyframes breathe {
   0%,
@@ -940,24 +878,6 @@ svg {
     transform: translateY(-3px);
   }
 }
-@keyframes head-sway {
-  0%,
-  to {
-    transform: rotate(-1deg);
-  }
-  50% {
-    transform: rotate(1.5deg);
-  }
-}
-@keyframes ribbon-sway {
-  0%,
-  to {
-    transform: rotate(-2deg);
-  }
-  50% {
-    transform: rotate(5deg);
-  }
-}
 @keyframes mote-glow {
   0%,
   to {
@@ -965,17 +885,6 @@ svg {
   }
   50% {
     opacity: 1;
-  }
-}
-@keyframes blink {
-  0%,
-  42%,
-  46%,
-  to {
-    transform: scaleY(1);
-  }
-  44% {
-    transform: scaleY(0.1);
   }
 }
 @keyframes meditate-float {
@@ -1009,33 +918,6 @@ svg {
     transform: translateY(-4px);
   }
 }
-@keyframes step-left {
-  0%,
-  to {
-    transform: rotate(-9deg);
-  }
-  50% {
-    transform: rotate(9deg);
-  }
-}
-@keyframes step-right {
-  0%,
-  to {
-    transform: rotate(9deg);
-  }
-  50% {
-    transform: rotate(-9deg);
-  }
-}
-@keyframes brew-hand {
-  0%,
-  to {
-    transform: rotate(-10deg);
-  }
-  50% {
-    transform: rotate(-26deg);
-  }
-}
 @keyframes steam-rise {
   0% {
     transform: translateY(6px);
@@ -1065,15 +947,6 @@ svg {
   }
   50% {
     transform: translateY(-25px) rotate(-3deg);
-  }
-}
-@keyframes ribbon-flight {
-  0%,
-  to {
-    transform: rotate(-7deg);
-  }
-  50% {
-    transform: rotate(-17deg);
   }
 }
 @media (prefers-reduced-motion: reduce) {

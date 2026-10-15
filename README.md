@@ -4,9 +4,10 @@
 
 ## 恢复范围
 
-- `src/renderer/App.jsx` 与 `Character.jsx`：从当前运行包使用的前端 bundle 中提取的界面和原创 SVG 角色代码。保留 React 元素调用形式，函数内部的局部变量名部分已被打包器缩短。
+- `src/renderer/App.jsx`：从当前运行包使用的前端 bundle 中提取的界面代码。保留 React 元素调用形式，函数内部的局部变量名部分已被打包器缩短。
+- `src/renderer/Character.jsx`：现使用从 `docs/character-reference.png` 提取的透明正面像素精灵。`src/renderer/assets/character-front.png` 是运行时素材；`scripts/extract-reference-sprite.py` 可用 Pillow 和 NumPy 重新生成它。
 - `scripts/recover-from-release.cjs`：可重复执行的提取脚本。传入原 Windows 运行包目录后会重新生成恢复文件，覆盖现有编辑，适用于核对来源，不适用于日常构建。
-- `src/renderer/styles.css`：运行包中的完整样式。
+- `src/renderer/styles.css`：以运行包样式为基础，现包含像素精灵与动作预览样式。
 - `src/electron/`：从编译输出恢复的主进程、preload、偏好规则和托盘补注册脚本。
 - `assets/tray.ico`：运行包中的托盘图标。
 - `docs/`：从现有运行包复制的需求、进度、交接和测试记录，作为历史资料保存。
