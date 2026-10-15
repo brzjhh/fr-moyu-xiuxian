@@ -1,0 +1,24 @@
+{
+  "name": "chentu-desktop-recovered",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Recovered source project for the Chentu desktop prototype",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build && node scripts/copy-electron.cjs",
+    "pack:from-release": "node scripts/package-from-release.cjs",
+    "start": "electron .",
+    "start:diagnostic": "electron . --no-sandbox",
+    "test": "node --test tests/*.test.cjs"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "electron": "35.7.5",
+    "prettier": "3.6.2",
+    "vite": "7.1.0"
+  }
+}
