@@ -1,72 +1,72 @@
 import React from "react";
-import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import Character from "./Character.jsx";
-const Ut = React;
-const s = { jsx, jsxs, Fragment };
-const DEFAULT_STATE = {
-    mode: "panel",
-    activity: "idle",
-    alwaysOnTop: !1,
-    clickThrough: !1,
-    scale: 1,
-    hidden: !1,
-    animation: !0,
+
+const DEFAULT_DESKTOP_STATE = {
+  mode: "panel",
+  activity: "idle",
+  alwaysOnTop: false,
+  clickThrough: false,
+  scale: 1,
+  hidden: false,
+  animation: true,
+};
+
+const DEFAULT_GAME_STATE = {
+  characterName: "青岚",
+  realmName: "炼气一层",
+  cultivation: 0,
+  totalCultivation: 0,
+  required: 60,
+  progress: 0,
+  canBreakthrough: false,
+  breakthroughCost: null,
+  maxRealm: false,
+  cultivating: false,
+  canCultivate: true,
+  gainPerSecond: 1,
+  offlineCapHours: 8,
+  inventory: {
+    spiritStone: 0,
+    dewHerb: 0,
+    ironOre: 0,
+    beastCore: 0,
+    gatheringPill: 0,
+    foundationPill: 0,
   },
-  DEFAULT_GAME_STATE = {
-    characterName: "青岚",
-    realmName: "炼气一层",
-    cultivation: 0,
-    totalCultivation: 0,
-    required: 60,
-    progress: 0,
-    canBreakthrough: !1,
-    maxRealm: !1,
-    cultivating: !1,
-    gainPerSecond: 1,
-    offlineCapHours: 8,
-    events: [],
-  },
-  ACTIVITIES = [
-    { value: "idle", name: "待机", symbol: "◇", note: "闲立听风，静候道友。" },
-    {
-      value: "meditate",
-      name: "打坐",
-      symbol: "◎",
-      note: "一呼一吸间，观照此刻。",
-    },
-    {
-      value: "walk",
-      name: "行走",
-      symbol: "彳",
-      note: "山间漫步，且行且从容。",
-    },
-    {
-      value: "alchemy",
-      name: "炼丹",
-      symbol: "♧",
-      note: "温炉候火，只作动作演示。",
-    },
-    {
-      value: "sword",
-      name: "御剑",
-      symbol: "↗",
-      note: "乘风御剑，掠过一川青岚。",
-    },
-  ],
-  PLANNED_PAGES = {
-    journeys: {
-      title: "山海游历",
-      subtitle: "行过山海，方见天地",
-      text: "计划探索地图、游历事件与归来见闻。当前没有出发、结算或掉落功能，待服务端与存档规则接入后开放。",
-      items: ["山海地图", "游历事件", "归来见闻"],
-    },
-    collection: {
-      title: "万物图鉴",
-      subtitle: "一草一木，皆有来处",
-      text: "计划收录灵植、丹方与法器。当前没有物品库存、合成或收藏进度，也不会生成虚构的解锁记录。",
-      items: ["灵植图录", "丹方考据", "法器收藏"],
-    },
-  };
+  itemLabels: {},
+  garden: [],
+  recipes: [],
+  alchemyJob: null,
+  journeyJob: null,
+  mainTask: "idle",
+  events: [],
+};
+
+const ACTIVITIES = [
+  { value: "idle", name: "待机", symbol: "◇", note: "闲立听风，静候道友。" },
+  { value: "meditate", name: "打坐", symbol: "◎", note: "每秒积累 1 点修为。" },
+  { value: "walk", name: "行走", symbol: "彳", note: "历练时自动切换为行走。" },
+  { value: "alchemy", name: "炼丹", symbol: "♧", note: "丹炉运转时自动切换。" },
+  { value: "sword", name: "御剑", symbol: "↗", note: "当前为动作预览。" },
+];
+
+const TABS = [
+  { id: "home", label: "修行", symbol: "◎" },
+  { id: "cave", label: "洞府", symbol: "田" },
+  { id: "journey", label: "历练", symbol: "山" },
+  { id: "inventory", label: "行囊", symbol: "囊" },
+  { id: "settings", label: "设置", symbol: "◇" },
+];
+
+const INVENTORY_ORDER = [
+  ["spiritStone", "灵", "修行与生产的通用资源"],
+  ["dewHerb", "草", "药园产出的基础灵草"],
+  ["ironOre", "矿", "历练取得的炼器材料"],
+  ["beastCore", "丹", "炼制筑基丹的关键材料"],
+  ["gatheringPill", "聚", "服用后增加 120 点修为"],
+  ["foundationPill", "筑", "炼气十三层突破所需"],
+];
+
 function formatEventTime(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -74,761 +74,930 @@ function formatEventTime(value) {
     : date.toLocaleTimeString("zh-CN", {
         hour: "2-digit",
         minute: "2-digit",
-        hour12: !1,
+        hour12: false,
       });
 }
+
+function remainingSeconds(item, now) {
+  if (!item || item.status !== "running") return 0;
+  return Math.max(0, Math.ceil((Date.parse(item.readyAt) - now) / 1000));
+}
+
+function timedProgress(item, now) {
+  if (!item) return 0;
+  if (item.status === "ready") return 1;
+  const start = Date.parse(item.startedAt ?? item.plantedAt);
+  const end = Date.parse(item.readyAt);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start)
+    return 0;
+  return Math.max(0, Math.min(1, (now - start) / (end - start)));
+}
+
+function formatCountdown(seconds) {
+  const safe = Math.max(0, seconds);
+  const minutes = Math.floor(safe / 60);
+  const remainder = safe % 60;
+  return minutes > 0
+    ? `${minutes}:${String(remainder).padStart(2, "0")}`
+    : `${remainder} 秒`;
+}
+
+function formatCosts(costs, labels) {
+  return Object.entries(costs)
+    .map(([key, amount]) => `${labels[key] ?? key} ${amount}`)
+    .join(" · ");
+}
+
+function SectionHeading({ eyebrow, title, chapter }) {
+  return (
+    <div className="section-heading">
+      <div>
+        <span className="eyebrow">{eyebrow}</span>
+        <h1>{title}</h1>
+      </div>
+      <span className="chapter">{chapter}</span>
+    </div>
+  );
+}
+
+function ProgressBar({ value, label }) {
+  const percent = Math.round(Math.max(0, Math.min(1, value ?? 0)) * 100);
+  return (
+    <div
+      className="cultivation-track"
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow={percent}
+    >
+      <span style={{ width: `${percent}%` }} />
+    </div>
+  );
+}
+
 function App() {
-  const [N, el] = Ut.useState(DEFAULT_STATE),
-    [gameState, setGameState] = Ut.useState(DEFAULT_GAME_STATE),
-    [gameMessage, setGameMessage] = Ut.useState(""),
-    [L, g] = Ut.useState("home"),
-    [x, w] = Ut.useState(""),
-    [Ml, Gl] = Ut.useState(!1),
-    [vl, zl] = Ut.useState(!window.desktop),
-    [p, b] = Ut.useState(!1),
-    Q = Ut.useRef(null),
-    Nl = Ut.useRef(0),
-    jl = Ut.useRef(!0),
-    Rl = !!window.desktop,
-    nl = ACTIVITIES.find((O) => O.value === N.activity) ?? ACTIVITIES[0],
-    gamePercent = Math.round((gameState.progress ?? 0) * 100);
-  Ut.useEffect(() => {
-    jl.current = !0;
-    const O = window.desktop;
-    if (!O)
-      return () => {
-        jl.current = !1;
-      };
-    let D = !0,
-      K = !1,
-      Xl;
-    try {
-      ((Xl = O.onState((ml) => {
-        D && ((K = !0), Nl.current++, el(ml), zl(!0));
-      })),
-        O.getState()
-          .then((ml) => {
-            D && (K || el(ml), zl(!0));
-          })
-          .catch(() => {
-            D && (w("无法读取窗口状态，请检查桌面桥接。"), zl(!0));
-          }));
-    } catch {
-      (w("桌面桥接初始化失败。"), zl(!0));
-    }
+  const [desktopState, setDesktopState] = React.useState(DEFAULT_DESKTOP_STATE);
+  const [gameState, setGameState] = React.useState(DEFAULT_GAME_STATE);
+  const [page, setPage] = React.useState("home");
+  const [error, setError] = React.useState("");
+  const [message, setMessage] = React.useState("");
+  const [ready, setReady] = React.useState(!window.desktop);
+  const [busy, setBusy] = React.useState(false);
+  const [previewMenu, setPreviewMenu] = React.useState(false);
+  const [now, setNow] = React.useState(Date.now());
+  const pointer = React.useRef(null);
+  const mounted = React.useRef(true);
+  const commandSequence = React.useRef(0);
+  const isDesktop = Boolean(window.desktop);
+  const activity =
+    ACTIVITIES.find((item) => item.value === desktopState.activity) ??
+    ACTIVITIES[0];
+  const mainTaskBusy = ["alchemy", "journey"].includes(gameState.mainTask);
+
+  React.useEffect(() => {
+    mounted.current = true;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => {
-      ((D = !1), (jl.current = !1), Xl == null || Xl());
+      mounted.current = false;
+      window.clearInterval(timer);
     };
   }, []);
-  Ut.useEffect(() => {
+
+  React.useEffect(() => {
+    const bridge = window.desktop;
+    if (!bridge) return;
+    let active = true;
+    let received = false;
+    const unsubscribe = bridge.onState((next) => {
+      if (!active) return;
+      received = true;
+      commandSequence.current += 1;
+      setDesktopState(next);
+      setReady(true);
+    });
+    bridge
+      .getState()
+      .then((next) => {
+        if (active && !received) setDesktopState(next);
+        if (active) setReady(true);
+      })
+      .catch(() => {
+        if (active) {
+          setError("无法读取窗口状态，请检查桌面桥接。");
+          setReady(true);
+        }
+      });
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  React.useEffect(() => {
     const bridge = window.desktop;
     if (!bridge?.getGameState || !bridge?.onGameState) return;
-    let active = !0;
+    let active = true;
     const unsubscribe = bridge.onGameState((next) => {
-      active && setGameState(next);
+      if (active) setGameState(next);
     });
     bridge
       .getGameState()
       .then((next) => active && setGameState(next))
-      .catch(() => active && w("无法读取本地修炼存档。"));
+      .catch(() => active && setError("无法读取本地修炼存档。"));
     return () => {
-      active = !1;
+      active = false;
       unsubscribe?.();
     };
   }, []);
-  async function Hl(O, D) {
-    const K = window.desktop;
-    if ((w(""), !K)) {
-      (el((ml) => {
-        switch (O) {
+
+  async function desktopCommand(actionName, value) {
+    setError("");
+    const bridge = window.desktop;
+    if (!bridge) {
+      setDesktopState((current) => {
+        switch (actionName) {
           case "mode":
-            return { ...ml, mode: D };
+            return { ...current, mode: value };
           case "activity":
-            return { ...ml, activity: D };
+            return { ...current, activity: value };
           case "top":
-            return { ...ml, alwaysOnTop: !!D };
-          case "through":
-            return { ...ml, clickThrough: !!D };
+            return { ...current, alwaysOnTop: Boolean(value) };
           case "scale":
-            return { ...ml, scale: Number(D) };
+            return { ...current, scale: Number(value) };
           case "hide":
-            return { ...ml, hidden: !ml.hidden };
+            return { ...current, hidden: !current.hidden };
           default:
-            return ml;
+            return current;
         }
-      }),
-        O === "menu" && Gl(!0));
+      });
+      if (actionName === "menu") setPreviewMenu(true);
       return;
     }
-    const Xl = ++Nl.current;
+    const sequence = ++commandSequence.current;
     try {
-      const ml = await K.command(O, D);
-      jl.current && Xl === Nl.current && el(ml);
+      const next = await bridge.command(actionName, value);
+      if (mounted.current && sequence === commandSequence.current)
+        setDesktopState(next);
     } catch {
-      jl.current && w(`操作「${O}」未完成，请重试。`);
+      if (mounted.current) setError(`操作“${actionName}”未完成，请重试。`);
     }
   }
-  async function rl(O, D) {
-    p || (b(!0), await Hl(O, D), jl.current && b(!1));
+
+  async function runDesktopCommand(actionName, value) {
+    if (busy) return;
+    setBusy(true);
+    await desktopCommand(actionName, value);
+    if (mounted.current) setBusy(false);
   }
-  async function runGameAction(action) {
+
+  async function runGameAction(actionName, payload) {
     const bridge = window.desktop;
-    if (p || !bridge?.gameCommand) return;
-    b(!0);
-    w("");
-    setGameMessage("");
+    if (busy || !bridge?.gameCommand) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
     try {
-      const result = await bridge.gameCommand(action);
-      if (jl.current) {
+      const result = await bridge.gameCommand(actionName, payload);
+      if (mounted.current) {
         setGameState(result.state);
-        setGameMessage(result.message ?? "");
+        setMessage(result.message ?? "");
       }
     } catch {
-      jl.current && w("存档操作未完成，请检查文件后重试。");
+      if (mounted.current) setError("存档操作未完成，请重试。");
     } finally {
-      jl.current && b(!1);
+      if (mounted.current) setBusy(false);
     }
   }
-  function Pt(O) {
-    O.button !== 0 ||
-      O.target.closest("button") ||
-      (O.preventDefault(),
-      O.currentTarget.setPointerCapture(O.pointerId),
-      (Q.current = { id: O.pointerId, x: O.screenX, y: O.screenY, moved: !1 }),
-      Hl("drag-start", { x: O.screenX, y: O.screenY }));
+
+  function pointerDown(event) {
+    if (event.button !== 0 || event.target.closest("button")) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    pointer.current = {
+      id: event.pointerId,
+      x: event.screenX,
+      y: event.screenY,
+      moved: false,
+    };
+    desktopCommand("drag-start", { x: event.screenX, y: event.screenY });
   }
-  function Et(O) {
-    const D = Q.current;
-    !D ||
-      D.id !== O.pointerId ||
-      (Math.hypot(O.screenX - D.x, O.screenY - D.y) > 5 && (D.moved = !0),
-      D.moved && Hl("drag-move", { x: O.screenX, y: O.screenY }));
+
+  function pointerMove(event) {
+    const current = pointer.current;
+    if (!current || current.id !== event.pointerId) return;
+    if (Math.hypot(event.screenX - current.x, event.screenY - current.y) > 5)
+      current.moved = true;
+    if (current.moved)
+      desktopCommand("drag-move", { x: event.screenX, y: event.screenY });
   }
-  function ut(O, D = !1) {
-    const K = Q.current;
-    !K ||
-      K.id !== O.pointerId ||
-      ((Q.current = null),
-      Hl("drag-end"),
-      O.currentTarget.hasPointerCapture(O.pointerId) &&
-        O.currentTarget.releasePointerCapture(O.pointerId),
-      !D && !K.moved && rl("mode", "panel"));
+
+  function pointerEnd(event, cancelled = false) {
+    const current = pointer.current;
+    if (!current || current.id !== event.pointerId) return;
+    pointer.current = null;
+    desktopCommand("drag-end");
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (!cancelled && !current.moved) runDesktopCommand("mode", "panel");
   }
-  return N.mode === "pet"
-    ? s.jsxs("main", {
-        className: `pet-mode ${N.hidden ? "hidden-state" : ""}`,
-        style: { "--pet-scale": N.scale },
-        children: [
-          s.jsxs("div", {
-            className: "pet-drag-surface",
-            onPointerDown: Pt,
-            onPointerMove: Et,
-            onPointerUp: (O) => ut(O),
-            onPointerCancel: (O) => ut(O, !0),
-            onLostPointerCapture: (O) => ut(O, !0),
-            onContextMenu: (O) => {
-              (O.preventDefault(), Hl("menu"));
-            },
-            children: [
-              s.jsx(Character, {
-                activity: N.activity,
-                paused: N.hidden || !N.animation,
-              }),
-              s.jsxs("div", {
-                className: "pet-caption",
-                children: ["青岚 · ", nl.name],
-              }),
-            ],
-          }),
-          s.jsx("button", {
-            className: "pet-open",
-            onClick: () => void rl("mode", "panel"),
-            "aria-label": "打开洞府",
-            children: "入府 ↗",
-          }),
-          !Rl &&
-            s.jsxs("div", {
-              className: "pet-preview",
-              children: [
-                "浏览器预览 · 拖动不移动窗口",
-                N.hidden &&
-                  s.jsx("button", {
-                    onClick: () => void rl("hide"),
-                    children: "恢复显示",
-                  }),
-              ],
-            }),
-          Ml &&
-            s.jsxs("div", {
-              className: "pet-menu",
-              children: [
-                s.jsx("span", { children: "本地预览菜单" }),
-                s.jsx("button", {
-                  onClick: () => {
-                    (Gl(!1), rl("mode", "panel"));
-                  },
-                  children: "打开洞府",
-                }),
-                ACTIVITIES.map((O) =>
-                  s.jsx(
-                    "button",
-                    {
-                      onClick: () => {
-                        (Gl(!1), rl("activity", O.value));
-                      },
-                      children: O.name,
-                    },
-                    O.value,
-                  ),
-                ),
-                s.jsx("button", {
-                  onClick: () => Gl(!1),
-                  children: "关闭菜单",
-                }),
-              ],
-            }),
-          x &&
-            s.jsx("div", {
-              className: "pet-error",
-              role: "alert",
-              children: x,
-            }),
-        ],
-      })
-    : s.jsxs("main", {
-        className: "palace",
-        children: [
-          s.jsxs("header", {
-            className: "titlebar",
-            children: [
-              s.jsx("div", { className: "brand-seal", children: "尘途" }),
-              s.jsxs("div", {
-                className: "brand",
-                children: [
-                  s.jsxs("strong", {
-                    children: ["尘途 ", s.jsx("i", { children: "CHENTU" })],
-                  }),
-                  s.jsx("span", { children: "一方洞府 · 一念清闲" }),
-                ],
-              }),
-              s.jsx("button", {
-                className: "window-action",
-                disabled: !vl || p,
-                onClick: () => void rl("mode", "pet"),
-                title: "切换透明桌宠",
-                children: "桌宠 ↗",
-              }),
-              s.jsx("button", {
-                className: "window-action icon-action",
-                disabled: !vl || p,
-                onClick: () => void rl("hide"),
-                "aria-label": "隐藏到托盘",
-                title: "隐藏到托盘，点击托盘图标恢复",
-                children: "−",
-              }),
-            ],
-          }),
-          s.jsxs("div", {
-            className: "prototype-banner",
-            children: [
-              s.jsx("span", { className: "status-dot" }),
-              "阶段 B · 本地修炼",
-              s.jsx("span", {
-                className: "offline-label",
-                children: "0.2 · 本地存档",
-              }),
-            ],
-          }),
-          s.jsx("nav", {
-            className: "tabs",
-            "aria-label": "洞府导航",
-            children: [
-              { id: "home", label: "修行", icon: "◇" },
-              { id: "journeys", label: "游历", icon: "山" },
-              { id: "collection", label: "图鉴", icon: "册" },
-              { id: "settings", label: "设置", icon: "⚙" },
-            ].map((O) =>
-              s.jsxs(
-                "button",
-                {
-                  className: L === O.id ? "active" : "",
-                  onClick: () => g(O.id),
-                  "aria-current": L === O.id ? "page" : void 0,
-                  children: [
-                    s.jsx("span", { children: O.icon }),
-                    O.label,
-                    (O.id === "journeys" || O.id === "collection") &&
-                      s.jsx("small", { children: "筹备" }),
-                  ],
-                },
-                O.id,
-              ),
-            ),
-          }),
-          s.jsxs("section", {
-            className: "panel-content",
-            children: [
-              x &&
-                s.jsx("div", {
-                  className: "error-banner",
-                  role: "alert",
-                  children: x,
-                }),
-              !Rl &&
-                s.jsx("div", {
-                  className: "browser-note",
-                  children: "浏览器预览 · 窗口设置仅模拟，不影响系统",
-                }),
-              N.hidden &&
-                s.jsxs("div", {
-                  className: "browser-note",
-                  children: [
-                    "窗口已标记隐藏，动画暂停。",
-                    !Rl &&
-                      s.jsx("button", {
-                        onClick: () => void rl("hide"),
-                        children: "恢复预览",
-                      }),
-                  ],
-                }),
-              L === "home" &&
-                s.jsxs(s.Fragment, {
-                  children: [
-                    s.jsxs("div", {
-                      className: "section-heading",
-                      children: [
-                        s.jsxs("div", {
-                          children: [
-                            s.jsx("span", {
-                              className: "eyebrow",
-                              children: "YOUR LITTLE SANCTUARY",
-                            }),
-                            s.jsx("h1", { children: "今日，亦可从容" }),
-                          ],
-                        }),
-                        s.jsx("span", {
-                          className: "chapter",
-                          children: "壹 · 修行",
-                        }),
-                      ],
-                    }),
-                    s.jsxs("div", {
-                      className: "cultivation-overview",
-                      children: [
-                        s.jsxs("div", {
-                          className: "cultivation-summary",
-                          children: [
-                            s.jsxs("div", {
-                              children: [
-                                s.jsx("span", { children: "当前境界" }),
-                                s.jsx("strong", {
-                                  children: gameState.realmName,
-                                }),
-                              ],
-                            }),
-                            s.jsxs("div", {
-                              className: "cultivation-value",
-                              children: [
-                                s.jsx("b", {
-                                  children: gameState.cultivation,
-                                }),
-                                s.jsx("span", {
-                                  children:
-                                    gameState.required == null
-                                      ? "修为"
-                                      : ` / ${gameState.required}`,
-                                }),
-                              ],
-                            }),
-                          ],
-                        }),
-                        s.jsx("div", {
-                          className: "cultivation-track",
-                          role: "progressbar",
-                          "aria-label": "修为进度",
-                          "aria-valuemin": 0,
-                          "aria-valuemax": 100,
-                          "aria-valuenow": gamePercent,
-                          children: s.jsx("span", {
-                            style: { width: `${gamePercent}%` },
-                          }),
-                        }),
-                        s.jsxs("div", {
-                          className: "cultivation-meta",
-                          children: [
-                            s.jsx("span", {
-                              className: gameState.cultivating
-                                ? "cultivating"
-                                : "",
-                              children: gameState.cultivating
-                                ? `吐纳中 · +${gameState.gainPerSecond}/秒`
-                                : "修炼暂停 · 选择打坐开始吐纳",
-                            }),
-                            s.jsx("button", {
-                              className: "breakthrough-button",
-                              disabled:
-                                !Rl ||
-                                p ||
-                                !gameState.canBreakthrough ||
-                                gameState.maxRealm,
-                              onClick: () => void runGameAction("breakthrough"),
-                              children: gameState.maxRealm
-                                ? "已至炼气圆满"
-                                : "突破",
-                            }),
-                          ],
-                        }),
-                        gameMessage &&
-                          s.jsx("p", {
-                            className: "game-message",
-                            children: gameMessage,
-                          }),
-                      ],
-                    }),
-                    s.jsxs("div", {
-                      className: "scene",
-                      children: [
-                        s.jsx("div", { className: "scene-moon" }),
-                        s.jsx("div", { className: "mountain mountain-far" }),
-                        s.jsx("div", { className: "mountain mountain-near" }),
-                        s.jsx("div", { className: "scene-ring" }),
-                        s.jsxs("span", {
-                          className: "scene-calligraphy",
-                          children: ["心静", s.jsx("br", {}), "自有清风"],
-                        }),
-                        s.jsx("span", {
-                          className: "scene-corner",
-                          children: "青岚居",
-                        }),
-                        s.jsx(Character, {
-                          activity: N.activity,
-                          paused: N.hidden || !N.animation,
-                        }),
-                        s.jsx("div", { className: "scene-floor" }),
-                        s.jsxs("div", {
-                          className: "character-label",
-                          children: [
-                            s.jsx("span", { className: "status-dot" }),
-                            "青岚 ",
-                            s.jsxs("span", { children: ["· ", nl.name, "中"] }),
-                          ],
-                        }),
-                        s.jsx("span", {
-                          className: "scene-mark",
-                          children: "原 创 修 士",
-                        }),
-                      ],
-                    }),
-                    s.jsxs("div", {
-                      className: "activity-heading",
-                      children: [
-                        s.jsx("h2", { children: "修行日常" }),
-                        s.jsx("span", { children: "打坐积累真实修为" }),
-                      ],
-                    }),
-                    s.jsx("div", {
-                      className: "activity-grid",
-                      children: ACTIVITIES.map((O) =>
-                        s.jsxs(
-                          "button",
-                          {
-                            "aria-pressed": N.activity === O.value,
-                            disabled: !vl || p,
-                            className: N.activity === O.value ? "selected" : "",
-                            onClick: () => void rl("activity", O.value),
-                            children: [
-                              s.jsx("span", {
-                                className: "activity-symbol",
-                                children: O.symbol,
-                              }),
-                              s.jsx("span", { children: O.name }),
-                              s.jsx("span", {
-                                className: "selected-mark",
-                                children: N.activity === O.value ? "·" : "",
-                              }),
-                            ],
-                          },
-                          O.value,
-                        ),
-                      ),
-                    }),
-                    s.jsx("p", {
-                      className: "activity-note",
-                      children:
-                        N.activity === "meditate"
-                          ? `每秒获得 ${gameState.gainPerSecond} 点修为；离线收益最多 ${gameState.offlineCapHours} 小时。`
-                          : `${nl.note} 切换离开打坐会暂停修为增长。`,
-                    }),
-                    s.jsxs("div", {
-                      className: "cultivation-log",
-                      children: [
-                        s.jsxs("div", {
-                          className: "cultivation-log-heading",
-                          children: [
-                            s.jsx("strong", { children: "修行纪要" }),
-                            s.jsx("span", {
-                              children: `累计 ${gameState.totalCultivation} 修为`,
-                            }),
-                          ],
-                        }),
-                        s.jsx("div", {
-                          className: "cultivation-events",
-                          children: gameState.events.slice(0, 3).map((entry) =>
-                            s.jsxs(
-                              "p",
-                              {
-                                children: [
-                                  s.jsx("time", {
-                                    children: formatEventTime(entry.at),
-                                  }),
-                                  s.jsx("span", { children: entry.text }),
-                                ],
-                              },
-                              entry.id,
-                            ),
-                          ),
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              L === "settings" &&
-                s.jsxs(s.Fragment, {
-                  children: [
-                    s.jsxs("div", {
-                      className: "section-heading",
-                      children: [
-                        s.jsxs("div", {
-                          children: [
-                            s.jsx("span", {
-                              className: "eyebrow",
-                              children: "MAKE YOURSELF AT HOME",
-                            }),
-                            s.jsx("h1", { children: "桌面，亦是洞府" }),
-                          ],
-                        }),
-                        s.jsx("span", {
-                          className: "chapter",
-                          children: "肆 · 设置",
-                        }),
-                      ],
-                    }),
-                    s.jsxs("div", {
-                      className: "settings-card",
-                      children: [
-                        s.jsx(SettingRow, {
-                          title: "始终置顶",
-                          note: "让小修士陪在其他窗口之上",
-                          checked: N.alwaysOnTop,
-                          disabled: !vl || p,
-                          onChange: (O) => void rl("top", O),
-                        }),
-                        s.jsx(SettingRow, {
-                          title: "鼠标穿透",
-                          note: "仅桌宠模式可用，请右键桌宠或托盘菜单开启",
-                          checked: N.clickThrough,
-                          disabled: !0,
-                          onChange: (O) => void rl("through", O),
-                        }),
-                        s.jsxs("div", {
-                          className: "setting-row scale-setting",
-                          children: [
-                            s.jsxs("div", {
-                              children: [
-                                s.jsx("strong", { children: "桌宠尺寸" }),
-                                s.jsx("p", {
-                                  children: "选择最合适的陪伴距离",
-                                }),
-                              ],
-                            }),
-                            s.jsx("div", {
-                              className: "segmented",
-                              children: [0.75, 1, 1.25].map((O) =>
-                                s.jsx(
-                                  "button",
-                                  {
-                                    "aria-pressed": N.scale === O,
-                                    className: N.scale === O ? "selected" : "",
-                                    disabled: !vl || p,
-                                    onClick: () => void rl("scale", O),
-                                    children:
-                                      O === 1
-                                        ? "标准"
-                                        : O < 1
-                                          ? "小巧"
-                                          : "放大",
-                                  },
-                                  O,
-                                ),
-                              ),
-                            }),
-                          ],
-                        }),
-                        s.jsxs("div", {
-                          className: "setting-row",
-                          children: [
-                            s.jsxs("div", {
-                              children: [
-                                s.jsx("strong", { children: "动画状态" }),
-                                s.jsx("p", {
-                                  children: "遵循系统减少动态偏好；隐藏时暂停",
-                                }),
-                              ],
-                            }),
-                            s.jsx("span", {
-                              className: "setting-value",
-                              children:
-                                N.animation && !N.hidden ? "已开启" : "已暂停",
-                            }),
-                          ],
-                        }),
-                      ],
-                    }),
-                    s.jsxs("div", {
-                      className: "save-actions",
-                      children: [
-                        s.jsxs("div", {
-                          children: [
-                            s.jsx("strong", { children: "修炼存档" }),
-                            s.jsx("p", {
-                              children: "自动保存在本机，可另行导出备份。",
-                            }),
-                          ],
-                        }),
-                        s.jsxs("div", {
-                          className: "save-buttons",
-                          children: [
-                            s.jsx("button", {
-                              disabled: !Rl || p,
-                              onClick: () => void runGameAction("import"),
-                              children: "导入",
-                            }),
-                            s.jsx("button", {
-                              disabled: !Rl || p,
-                              onClick: () => void runGameAction("export"),
-                              children: "导出",
-                            }),
-                          ],
-                        }),
-                      ],
-                    }),
-                    gameMessage &&
-                      s.jsx("p", {
-                        className: "settings-message",
-                        children: gameMessage,
-                      }),
-                    s.jsxs("button", {
-                      className: "primary-button",
-                      disabled: !vl || p,
-                      onClick: () => void rl("mode", "pet"),
-                      children: [
-                        "◇ 返回透明桌宠 ",
-                        s.jsx("span", { children: "↗" }),
-                      ],
-                    }),
-                    s.jsxs("div", {
-                      className: "settings-help",
-                      children: [
-                        s.jsx("h2", { children: "陪伴的小秘诀" }),
-                        s.jsxs("p", {
-                          children: [
-                            "拖动小修士移动窗口，单击进入洞府。",
-                            s.jsx("br", {}),
-                            "右键打开菜单；鼠标穿透后请用托盘恢复。",
-                            s.jsx("br", {}),
-                            "洞府顶部可拖动，按钮与控件不参与拖动。",
-                          ],
-                        }),
-                      ],
-                    }),
-                  ],
-                }),
-              (L === "journeys" || L === "collection") &&
-                s.jsxs("div", {
-                  className: "planned-page",
-                  children: [
-                    s.jsx("span", {
-                      className: "eyebrow",
-                      children: "A CHAPTER YET TO UNFOLD",
-                    }),
-                    s.jsx("div", {
-                      className: "planned-symbol",
-                      children: L === "journeys" ? "山" : "册",
-                    }),
-                    s.jsx("span", {
-                      className: "planned-badge",
-                      children: "规划中 · 尚未开放",
-                    }),
-                    s.jsx("h1", { children: PLANNED_PAGES[L].title }),
-                    s.jsx("p", {
-                      className: "planned-subtitle",
-                      children: PLANNED_PAGES[L].subtitle,
-                    }),
-                    s.jsx("p", {
-                      className: "planned-description",
-                      children: PLANNED_PAGES[L].text,
-                    }),
-                    s.jsx("div", {
-                      className: "planned-list",
-                      children: PLANNED_PAGES[L].items.map((O, D) =>
-                        s.jsxs(
-                          "div",
-                          {
-                            children: [
-                              s.jsxs("span", { children: ["0", D + 1] }),
-                              O,
-                              s.jsx("small", { children: "计划" }),
-                            ],
-                          },
-                          O,
-                        ),
-                      ),
-                    }),
-                    s.jsx("button", {
-                      className: "text-button",
-                      onClick: () => g("home"),
-                      children: "返回修行动作预览 ↗",
-                    }),
-                  ],
-                }),
-            ],
-          }),
-          s.jsxs("footer", {
-            className: "panel-footer",
-            children: [
-              s.jsx("span", { children: "尘途 · 与你共一段清闲" }),
-              s.jsx("span", { children: "LOCAL / 0.2.0" }),
-            ],
-          }),
-        ],
-      });
+
+  if (desktopState.mode === "pet") {
+    return (
+      <main
+        className={`pet-mode ${desktopState.hidden ? "hidden-state" : ""}`}
+        style={{ "--pet-scale": desktopState.scale }}
+      >
+        <div
+          className="pet-drag-surface"
+          onPointerDown={pointerDown}
+          onPointerMove={pointerMove}
+          onPointerUp={(event) => pointerEnd(event)}
+          onPointerCancel={(event) => pointerEnd(event, true)}
+          onLostPointerCapture={(event) => pointerEnd(event, true)}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            desktopCommand("menu");
+          }}
+        >
+          <Character
+            activity={desktopState.activity}
+            paused={desktopState.hidden || !desktopState.animation}
+          />
+          <div className="pet-caption">
+            青岚 · {activity.name}
+            {gameState.mainTask !== "idle" ? ` · ${gameState.realmName}` : ""}
+          </div>
+        </div>
+        <button
+          className="pet-open"
+          onClick={() => runDesktopCommand("mode", "panel")}
+          aria-label="打开洞府"
+        >
+          入府 ↗
+        </button>
+        {!isDesktop && (
+          <div className="pet-preview">
+            浏览器预览 · 拖动不移动窗口
+            {desktopState.hidden && (
+              <button onClick={() => runDesktopCommand("hide")}>
+                恢复显示
+              </button>
+            )}
+          </div>
+        )}
+        {previewMenu && (
+          <div className="pet-menu">
+            <span>本地预览菜单</span>
+            <button onClick={() => runDesktopCommand("mode", "panel")}>
+              打开洞府
+            </button>
+            {ACTIVITIES.map((item) => (
+              <button
+                key={item.value}
+                onClick={() => {
+                  setPreviewMenu(false);
+                  runDesktopCommand("activity", item.value);
+                }}
+              >
+                {item.name}
+              </button>
+            ))}
+            <button onClick={() => setPreviewMenu(false)}>关闭菜单</button>
+          </div>
+        )}
+        {error && <div className="pet-error">{error}</div>}
+      </main>
+    );
+  }
+
+  return (
+    <main className="palace">
+      <header className="titlebar">
+        <div className="brand-seal">尘途</div>
+        <div className="brand">
+          <strong>青岚洞府</strong>
+          <i>CHENTU</i>
+          <span>炼气修行 · 洞府经营</span>
+        </div>
+        <button
+          className="window-action"
+          disabled={!ready || busy}
+          onClick={() => runDesktopCommand("mode", "pet")}
+        >
+          桌宠 ↗
+        </button>
+        <button
+          className="window-action icon-action"
+          aria-label="隐藏到托盘"
+          title="隐藏到托盘"
+          disabled={!ready || busy}
+          onClick={() => runDesktopCommand("hide")}
+        >
+          −
+        </button>
+      </header>
+
+      <div className="prototype-banner">
+        <span className="status-dot" />
+        <span>本地单人存档</span>
+        <span className="offline-label">
+          {gameState.mainTask === "meditate"
+            ? "吐纳中"
+            : gameState.mainTask === "alchemy"
+              ? "丹炉运转"
+              : gameState.mainTask === "journey"
+                ? "历练途中"
+                : "闲置"}
+        </span>
+      </div>
+
+      <nav className="tabs" aria-label="洞府导航">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            className={page === tab.id ? "active" : ""}
+            onClick={() => {
+              setPage(tab.id);
+              setMessage("");
+            }}
+          >
+            <span>{tab.symbol}</span>
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <section className="panel-content">
+        {!isDesktop && (
+          <div className="browser-note">
+            浏览器仅展示界面，修炼与存档操作需要 Electron。
+          </div>
+        )}
+        {error && <div className="error-banner">{error}</div>}
+        {message && <div className="success-banner">{message}</div>}
+
+        {page === "home" && (
+          <HomePage
+            desktopState={desktopState}
+            gameState={gameState}
+            activity={activity}
+            busy={busy}
+            isDesktop={isDesktop}
+            mainTaskBusy={mainTaskBusy}
+            onActivity={(value) => runDesktopCommand("activity", value)}
+            onBreakthrough={() => runGameAction("breakthrough")}
+          />
+        )}
+
+        {page === "cave" && (
+          <CavePage
+            gameState={gameState}
+            now={now}
+            busy={busy}
+            isDesktop={isDesktop}
+            onAction={runGameAction}
+          />
+        )}
+
+        {page === "journey" && (
+          <JourneyPage
+            gameState={gameState}
+            now={now}
+            busy={busy}
+            isDesktop={isDesktop}
+            onAction={runGameAction}
+          />
+        )}
+
+        {page === "inventory" && (
+          <InventoryPage
+            gameState={gameState}
+            busy={busy}
+            isDesktop={isDesktop}
+            onAction={runGameAction}
+          />
+        )}
+
+        {page === "settings" && (
+          <SettingsPage
+            desktopState={desktopState}
+            busy={busy}
+            isDesktop={isDesktop}
+            onDesktopAction={runDesktopCommand}
+            onGameAction={runGameAction}
+          />
+        )}
+      </section>
+
+      <footer className="panel-footer">
+        <span>尘途 · 与你共一段清闲</span>
+        <span>LOCAL / 0.3.0</span>
+      </footer>
+    </main>
+  );
 }
-function SettingRow({
-  title: N,
-  note: el,
-  checked: L,
-  disabled: g,
-  onChange: x,
+
+function HomePage({
+  desktopState,
+  gameState,
+  activity,
+  busy,
+  isDesktop,
+  mainTaskBusy,
+  onActivity,
+  onBreakthrough,
 }) {
-  return s.jsxs("div", {
-    className: "setting-row",
-    children: [
-      s.jsxs("div", {
-        children: [
-          s.jsx("strong", { children: N }),
-          s.jsx("p", { children: el }),
-        ],
-      }),
-      s.jsx("button", {
-        className: `toggle ${L ? "on" : ""}`,
-        role: "switch",
-        "aria-label": N,
-        "aria-checked": L,
-        disabled: g,
-        onClick: () => x(!L),
-        children: s.jsx("span", {}),
-      }),
-    ],
-  });
+  const gamePercent = Math.round((gameState.progress ?? 0) * 100);
+  return (
+    <>
+      <SectionHeading
+        eyebrow="YOUR LITTLE SANCTUARY"
+        title="今日，亦可从容"
+        chapter="壹 · 修行"
+      />
+      <div className="cultivation-overview">
+        <div className="cultivation-summary">
+          <div>
+            <span>当前境界</span>
+            <strong>{gameState.realmName}</strong>
+          </div>
+          <div className="cultivation-value">
+            <b>{gameState.cultivation}</b>
+            <span>
+              {gameState.required == null
+                ? " 修为"
+                : ` / ${gameState.required}`}
+            </span>
+          </div>
+        </div>
+        <ProgressBar value={gameState.progress} label="修为进度" />
+        <div className="cultivation-meta">
+          <span className={gameState.cultivating ? "cultivating" : ""}>
+            {gameState.cultivating
+              ? `吐纳中 · +${gameState.gainPerSecond}/秒`
+              : gameState.breakthroughCost
+                ? `筑基需 ${gameState.breakthroughCost}`
+                : `修炼暂停 · 当前 ${gamePercent}%`}
+          </span>
+          <button
+            className="breakthrough-button"
+            disabled={
+              !isDesktop ||
+              busy ||
+              !gameState.canBreakthrough ||
+              gameState.maxRealm
+            }
+            onClick={onBreakthrough}
+          >
+            {gameState.maxRealm ? "已至筑基" : "突破"}
+          </button>
+        </div>
+      </div>
+
+      <div className="scene">
+        <div className="scene-moon" />
+        <div className="mountain mountain-far" />
+        <div className="mountain mountain-near" />
+        <div className="scene-ring" />
+        <span className="scene-calligraphy">
+          心静
+          <br />
+          自有清风
+        </span>
+        <span className="scene-corner">青岚居</span>
+        <Character
+          activity={desktopState.activity}
+          paused={desktopState.hidden || !desktopState.animation}
+        />
+        <div className="scene-floor" />
+        <div className="character-label">
+          <span className="status-dot" />
+          青岚 <span>· {activity.name}中</span>
+        </div>
+        <span className="scene-mark">洞 府 修 士</span>
+      </div>
+
+      <div className="activity-heading">
+        <h2>修行日常</h2>
+        <span>{mainTaskBusy ? "主任务进行中" : "打坐积累真实修为"}</span>
+      </div>
+      <div className="activity-grid">
+        {ACTIVITIES.map((item) => (
+          <button
+            key={item.value}
+            aria-pressed={desktopState.activity === item.value}
+            disabled={!isDesktop || busy || mainTaskBusy}
+            className={desktopState.activity === item.value ? "selected" : ""}
+            onClick={() => onActivity(item.value)}
+          >
+            <span className="activity-symbol">{item.symbol}</span>
+            <span>{item.name}</span>
+            <span className="selected-mark">
+              {desktopState.activity === item.value ? "·" : ""}
+            </span>
+          </button>
+        ))}
+      </div>
+      <p className="activity-note">
+        {mainTaskBusy
+          ? "炼丹或历练期间不能切换主任务，药园仍会独立生长。"
+          : desktopState.activity === "meditate"
+            ? `每秒获得 ${gameState.gainPerSecond} 点修为；离线收益最多 ${gameState.offlineCapHours} 小时。`
+            : `${activity.note} 切换离开打坐会暂停修为增长。`}
+      </p>
+
+      <div className="cultivation-log">
+        <div className="cultivation-log-heading">
+          <strong>修行纪要</strong>
+          <span>累计 {gameState.totalCultivation} 修为</span>
+        </div>
+        <div className="cultivation-events">
+          {gameState.events.slice(0, 4).map((entry) => (
+            <p key={entry.id}>
+              <time>{formatEventTime(entry.at)}</time>
+              <span>{entry.text}</span>
+            </p>
+          ))}
+        </div>
+      </div>
+    </>
+  );
 }
+
+function CavePage({ gameState, now, busy, isDesktop, onAction }) {
+  const labels = gameState.itemLabels;
+  return (
+    <>
+      <SectionHeading
+        eyebrow="GROW · REFINE · PREPARE"
+        title="洞府经营"
+        chapter="贰 · 洞府"
+      />
+      <div className="resource-ribbon">
+        <span>
+          灵石 <b>{gameState.inventory.spiritStone}</b>
+        </span>
+        <span>
+          凝露草 <b>{gameState.inventory.dewHerb}</b>
+        </span>
+        <span>
+          兽丹 <b>{gameState.inventory.beastCore}</b>
+        </span>
+      </div>
+
+      <section className="feature-section">
+        <div className="feature-heading">
+          <div>
+            <span className="feature-kicker">药园</span>
+            <h2>两畦凝露草</h2>
+          </div>
+          <small>种植消耗 2 灵石 · 收获 4 株</small>
+        </div>
+        <div className="garden-grid">
+          {gameState.garden.map((plot) => {
+            const seconds = remainingSeconds(plot, now);
+            const progress = timedProgress(plot, now);
+            return (
+              <div className={`garden-plot ${plot.status}`} key={plot.index}>
+                <div className="plot-visual" aria-hidden="true">
+                  <span>
+                    {plot.status === "empty"
+                      ? "·"
+                      : plot.status === "ready"
+                        ? "芽"
+                        : "苗"}
+                  </span>
+                </div>
+                <strong>药田 {plot.index + 1}</strong>
+                <p>
+                  {plot.status === "empty"
+                    ? "土地松软，可种凝露草"
+                    : plot.status === "ready"
+                      ? "灵气充盈，可以收获"
+                      : `生长中 · ${formatCountdown(seconds)}`}
+                </p>
+                {plot.status !== "empty" && (
+                  <ProgressBar value={progress} label="药田进度" />
+                )}
+                <button
+                  disabled={!isDesktop || busy || plot.status === "growing"}
+                  onClick={() =>
+                    onAction(plot.status === "ready" ? "harvest" : "plant", {
+                      plotIndex: plot.index,
+                    })
+                  }
+                >
+                  {plot.status === "ready"
+                    ? "收获"
+                    : plot.status === "growing"
+                      ? "培育中"
+                      : "种植"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="feature-section">
+        <div className="feature-heading">
+          <div>
+            <span className="feature-kicker">丹房</span>
+            <h2>一炉一丹方</h2>
+          </div>
+          <small>炼丹占用主任务</small>
+        </div>
+        {gameState.alchemyJob ? (
+          <div className={`active-job ${gameState.alchemyJob.status}`}>
+            <div className="job-symbol">炉</div>
+            <div className="job-copy">
+              <strong>{gameState.alchemyJob.name}</strong>
+              <p>
+                {gameState.alchemyJob.status === "ready"
+                  ? "丹火已息，可以开炉收丹。"
+                  : `凝练中 · ${formatCountdown(remainingSeconds(gameState.alchemyJob, now))}`}
+              </p>
+              <ProgressBar
+                value={timedProgress(gameState.alchemyJob, now)}
+                label="炼丹进度"
+              />
+            </div>
+            <button
+              disabled={
+                !isDesktop || busy || gameState.alchemyJob.status !== "ready"
+              }
+              onClick={() => onAction("claim-alchemy")}
+            >
+              {gameState.alchemyJob.status === "ready" ? "收丹" : "炼制中"}
+            </button>
+          </div>
+        ) : (
+          <div className="recipe-list">
+            {gameState.recipes.map((recipe) => (
+              <div className="recipe-row" key={recipe.id}>
+                <div>
+                  <strong>{recipe.name}</strong>
+                  <p>{recipe.note}</p>
+                  <small>
+                    {formatCosts(recipe.costs, labels)} ·{" "}
+                    {recipe.durationSeconds} 秒
+                  </small>
+                </div>
+                <button
+                  disabled={
+                    !isDesktop ||
+                    busy ||
+                    !recipe.canAfford ||
+                    gameState.mainTask === "journey"
+                  }
+                  onClick={() =>
+                    onAction("start-alchemy", { recipe: recipe.id })
+                  }
+                >
+                  开炉
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  );
+}
+
+function JourneyPage({ gameState, now, busy, isDesktop, onAction }) {
+  const job = gameState.journeyJob;
+  return (
+    <>
+      <SectionHeading
+        eyebrow="VENTURE BEYOND THE CAVE"
+        title="青石岭历练"
+        chapter="叁 · 历练"
+      />
+      <div className="journey-landscape">
+        <span className="journey-sun" />
+        <span className="ridge ridge-back" />
+        <span className="ridge ridge-front" />
+        <strong>青石岭</strong>
+        <small>推荐境界 · 炼气一层</small>
+      </div>
+
+      <section className="feature-section journey-details">
+        <div className="journey-facts">
+          <div>
+            <span>耗时</span>
+            <strong>45 秒</strong>
+          </div>
+          <div>
+            <span>策略</span>
+            <strong>稳妥采集</strong>
+          </div>
+          <div>
+            <span>风险</span>
+            <strong>低</strong>
+          </div>
+        </div>
+        <div className="reward-line">
+          <span>可能收获</span>
+          <p>灵石 8 · 凝露草 2 · 青纹矿 2 · 妖兽内丹 1</p>
+        </div>
+
+        {job ? (
+          <div className={`active-job journey-job ${job.status}`}>
+            <div className="job-symbol">行</div>
+            <div className="job-copy">
+              <strong>
+                {job.site} · {job.strategy}
+              </strong>
+              <p>
+                {job.status === "ready"
+                  ? "历练结束，所得已整理完毕。"
+                  : `采集途中 · ${formatCountdown(remainingSeconds(job, now))}`}
+              </p>
+              <ProgressBar value={timedProgress(job, now)} label="历练进度" />
+            </div>
+            <button
+              disabled={!isDesktop || busy || job.status !== "ready"}
+              onClick={() => onAction("claim-journey")}
+            >
+              {job.status === "ready" ? "领取" : "途中"}
+            </button>
+          </div>
+        ) : (
+          <button
+            className="primary-command"
+            disabled={!isDesktop || busy || gameState.mainTask === "alchemy"}
+            onClick={() => onAction("start-journey")}
+          >
+            <span>出发历练</span>
+            <span>山路虽远，所得可期 ↗</span>
+          </button>
+        )}
+      </section>
+
+      <div className="honest-note">
+        <span>规则</span>
+        <p>
+          历练采用本地确定性结算，不会丢失已有物品。离开客户端后计时仍会继续，回来后领取结果。
+        </p>
+      </div>
+    </>
+  );
+}
+
+function InventoryPage({ gameState, busy, isDesktop, onAction }) {
+  return (
+    <>
+      <SectionHeading
+        eyebrow="EVERY ITEM HAS A PURPOSE"
+        title="行囊百物"
+        chapter="肆 · 行囊"
+      />
+      <div className="inventory-list">
+        {INVENTORY_ORDER.map(([key, symbol, note]) => (
+          <div className="inventory-row" key={key}>
+            <span className="item-symbol">{symbol}</span>
+            <div>
+              <strong>{gameState.itemLabels[key] ?? key}</strong>
+              <p>{note}</p>
+            </div>
+            <b>{gameState.inventory[key] ?? 0}</b>
+            {key === "gatheringPill" && (
+              <button
+                title="服用聚气丹"
+                disabled={
+                  !isDesktop || busy || gameState.inventory.gatheringPill < 1
+                }
+                onClick={() => onAction("use-gathering-pill")}
+              >
+                服用
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="inventory-summary">
+        <span>累计修为</span>
+        <strong>{gameState.totalCultivation}</strong>
+        <p>物品没有容量上限；生产与历练所得会在领取后原子写入本地存档。</p>
+      </div>
+    </>
+  );
+}
+
+function SettingsPage({
+  desktopState,
+  busy,
+  isDesktop,
+  onDesktopAction,
+  onGameAction,
+}) {
+  return (
+    <>
+      <SectionHeading
+        eyebrow="MAKE YOURSELF AT HOME"
+        title="桌面，亦是洞府"
+        chapter="伍 · 设置"
+      />
+      <div className="settings-card">
+        <SettingRow
+          title="始终置顶"
+          note="让小修士陪在其他窗口之上"
+          checked={desktopState.alwaysOnTop}
+          disabled={busy}
+          onChange={(value) => onDesktopAction("top", value)}
+        />
+        <SettingRow
+          title="鼠标穿透"
+          note="仅桌宠模式可用，请通过托盘恢复"
+          checked={desktopState.clickThrough}
+          disabled
+          onChange={(value) => onDesktopAction("through", value)}
+        />
+        <div className="setting-row scale-setting">
+          <div>
+            <strong>桌宠尺寸</strong>
+            <p>选择最合适的陪伴距离</p>
+          </div>
+          <div className="segmented">
+            {[0.75, 1, 1.25].map((value) => (
+              <button
+                key={value}
+                aria-pressed={desktopState.scale === value}
+                className={desktopState.scale === value ? "selected" : ""}
+                disabled={busy}
+                onClick={() => onDesktopAction("scale", value)}
+              >
+                {value === 1 ? "标准" : value < 1 ? "小巧" : "放大"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="save-actions">
+        <div>
+          <strong>本地修炼存档 v2</strong>
+          <p>自动保存，可导入 v0.2 旧存档并迁移。</p>
+        </div>
+        <div className="save-buttons">
+          <button
+            disabled={!isDesktop || busy}
+            onClick={() => onGameAction("import")}
+          >
+            导入
+          </button>
+          <button
+            disabled={!isDesktop || busy}
+            onClick={() => onGameAction("export")}
+          >
+            导出
+          </button>
+        </div>
+      </div>
+
+      <button
+        className="primary-button"
+        disabled={busy}
+        onClick={() => onDesktopAction("mode", "pet")}
+      >
+        <span>◇ 返回透明桌宠</span>
+        <span>↗</span>
+      </button>
+      <div className="settings-help">
+        <h2>陪伴的小秘诀</h2>
+        <p>
+          拖动小修士移动窗口，单击进入洞府。
+          <br />
+          右键打开菜单；鼠标穿透后请用托盘恢复。
+          <br />
+          炼丹和历练是主任务，药园则会独立生长。
+        </p>
+      </div>
+    </>
+  );
+}
+
+function SettingRow({ title, note, checked, disabled, onChange }) {
+  return (
+    <div className="setting-row">
+      <div>
+        <strong>{title}</strong>
+        <p>{note}</p>
+      </div>
+      <button
+        className={`toggle ${checked ? "on" : ""}`}
+        role="switch"
+        aria-label={title}
+        aria-checked={checked}
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+      >
+        <span />
+      </button>
+    </div>
+  );
+}
+
 export default App;

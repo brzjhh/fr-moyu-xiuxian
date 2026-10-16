@@ -92,7 +92,7 @@ function saveGame() {
 function settleGame(options) {
   const result = (0, cultivation_1.settleGameState)(game, Date.now(), options);
   game = result.state;
-  if (result.gained > 0) gameDirty = true;
+  if (result.changed) gameDirty = true;
   return result;
 }
 function publicGameState() {
@@ -228,6 +228,12 @@ function command(action, value) {
         typeof value === "string" &&
         ["idle", "meditate", "walk", "alchemy", "sword"].includes(value)
       ) {
+        const mainTask = publicGameState().mainTask;
+        if (
+          (mainTask === "alchemy" && value !== "alchemy") ||
+          (mainTask === "journey" && value !== "walk")
+        )
+          break;
         settings.activity = value;
         save();
         game = (0, cultivation_1.setCultivating)(
@@ -298,15 +304,63 @@ function command(action, value) {
   publish();
   return state();
 }
-async function gameCommand(action) {
+function finishGameCommand(result) {
+  game = result.state;
+  if (result.activity) {
+    settings.activity = result.activity;
+    save();
+  }
+  gameDirty = true;
+  saveGame();
+  publishGame();
+  publish();
+  return { state: publicGameState(), message: result.message };
+}
+async function gameCommand(action, payload) {
   switch (action) {
     case "breakthrough": {
       const result = (0, cultivation_1.breakthrough)(game, Date.now());
-      game = result.state;
-      gameDirty = true;
-      saveGame();
-      publishGame();
-      return { state: publicGameState(), message: result.message };
+      return finishGameCommand(result);
+    }
+    case "plant": {
+      const result = (0, cultivation_1.plantHerb)(
+        game,
+        payload?.plotIndex,
+        Date.now(),
+      );
+      return finishGameCommand(result);
+    }
+    case "harvest": {
+      const result = (0, cultivation_1.harvestHerb)(
+        game,
+        payload?.plotIndex,
+        Date.now(),
+      );
+      return finishGameCommand(result);
+    }
+    case "start-alchemy": {
+      const result = (0, cultivation_1.startAlchemy)(
+        game,
+        payload?.recipe,
+        Date.now(),
+      );
+      return finishGameCommand(result);
+    }
+    case "claim-alchemy": {
+      const result = (0, cultivation_1.claimAlchemy)(game, Date.now());
+      return finishGameCommand(result);
+    }
+    case "start-journey": {
+      const result = (0, cultivation_1.startJourney)(game, Date.now());
+      return finishGameCommand(result);
+    }
+    case "claim-journey": {
+      const result = (0, cultivation_1.claimJourney)(game, Date.now());
+      return finishGameCommand(result);
+    }
+    case "use-gathering-pill": {
+      const result = (0, cultivation_1.useGatheringPill)(game, Date.now());
+      return finishGameCommand(result);
     }
     case "export": {
       settleGame();
@@ -501,11 +555,14 @@ if (!electron_1.app.requestSingleInstanceLock()) {
       if (event.sender !== win.webContents) throw new Error("Invalid sender");
       return publicGameState();
     });
-    electron_1.ipcMain.handle("game:command", async (event, action) => {
-      if (event.sender !== win.webContents || typeof action !== "string")
-        throw new Error("Invalid sender");
-      return gameCommand(action);
-    });
+    electron_1.ipcMain.handle(
+      "game:command",
+      async (event, action, payload) => {
+        if (event.sender !== win.webContents || typeof action !== "string")
+          throw new Error("Invalid sender");
+        return gameCommand(action, payload);
+      },
+    );
     electron_1.screen.on("display-removed", recover);
     electron_1.screen.on("display-metrics-changed", recover);
     electron_1.powerMonitor.on("resume", () => {
@@ -544,7 +601,7 @@ if (!electron_1.app.requestSingleInstanceLock()) {
     );
     gameTickTimer = setInterval(() => {
       const result = settleGame();
-      if (result.gained > 0) publishGame();
+      if (result.changed) publishGame();
     }, 1000);
     gameSaveTimer = setInterval(() => {
       if (gameDirty) saveGame();
@@ -596,6 +653,18 @@ async function runSmoke() {
     "window.desktop.getGameState()",
   );
   assert(initialGame.realmName === "炼气一层", "cultivation bridge");
+  assert(
+    initialGame.version === 2 && initialGame.garden.length === 2,
+    "version 2 game state",
+  );
+  const planted = await win.webContents.executeJavaScript(
+    'window.desktop.gameCommand("plant", { plotIndex: 0 })',
+  );
+  assert(
+    planted.state.garden[0].status === "growing" &&
+      planted.state.inventory.spiritStone === 18,
+    "garden command",
+  );
   command("activity", "meditate");
   await new Promise((resolve) => setTimeout(resolve, 1200));
   assert(publicGameState().cultivation >= 1, "cultivation tick");
@@ -619,7 +688,7 @@ async function runSmoke() {
   assert(state().mode === "panel" && win.getSize()[0] === 440, "panel");
   assert(
     await win.webContents.executeJavaScript(
-      'document.body.innerText.includes("本地存档")',
+      'document.body.innerText.includes("青岚洞府")',
     ),
     "panel UI synchronized",
   );
@@ -631,6 +700,30 @@ async function runSmoke() {
     node_path_1.default.join(process.cwd(), "artifacts", "panel.png"),
     (await win.webContents.capturePage()).toPNG(),
   );
+  for (const [label, expected, file] of [
+    ["洞府", "洞府经营", "cave.png"],
+    ["历练", "青石岭历练", "journey.png"],
+    ["行囊", "行囊百物", "inventory.png"],
+  ]) {
+    await win.webContents.executeJavaScript(
+      `Array.from(document.querySelectorAll(".tabs button")).find((button) => button.innerText.includes("${label}")).click()`,
+    );
+    await wait();
+    assert(
+      await win.webContents.executeJavaScript(
+        `document.body.innerText.includes("${expected}")`,
+      ),
+      `${label} page synchronized`,
+    );
+    node_fs_1.default.writeFileSync(
+      node_path_1.default.join(process.cwd(), "artifacts", file),
+      (await win.webContents.capturePage()).toPNG(),
+    );
+  }
+  await win.webContents.executeJavaScript(
+    'Array.from(document.querySelectorAll(".tabs button")).find((button) => button.innerText.includes("修行")).click()',
+  );
+  await wait();
   for (let i = 0; i < 5; i++) {
     command("mode", "pet");
     await wait();
@@ -693,6 +786,8 @@ async function runSmoke() {
         checks: [
           "renderer/bridge",
           "cultivation/persistence",
+          "garden/command",
+          "cave/journey/inventory pages",
           "activity",
           "top",
           "scale",

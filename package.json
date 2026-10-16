@@ -1,7 +1,7 @@
 {
   "name": "chentu-desktop-recovered",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Recovered source project for the Chentu desktop prototype",
   "main": "dist-electron/main.js",
   "scripts": {

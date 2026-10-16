@@ -12,8 +12,8 @@ electron_1.contextBridge.exposeInMainWorld("desktop", {
       electron_1.ipcRenderer.removeListener("desktop:updated", listener);
   },
   getGameState: () => electron_1.ipcRenderer.invoke("game:state"),
-  gameCommand: (action) =>
-    electron_1.ipcRenderer.invoke("game:command", action),
+  gameCommand: (action, payload) =>
+    electron_1.ipcRenderer.invoke("game:command", action, payload),
   onGameState: (callback) => {
     const listener = (_event, state) => callback(state);
     electron_1.ipcRenderer.on("game:updated", listener);
