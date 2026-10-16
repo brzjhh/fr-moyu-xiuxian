@@ -8,6 +8,7 @@ fs.mkdirSync(output, { recursive: true });
 for (const name of [
   "main.js",
   "settings.js",
+  "cultivation.js",
   "preload.js",
   "repair-tray.ps1",
 ]) {

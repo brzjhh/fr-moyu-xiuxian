@@ -12,6 +12,20 @@ const DEFAULT_STATE = {
     hidden: !1,
     animation: !0,
   },
+  DEFAULT_GAME_STATE = {
+    characterName: "青岚",
+    realmName: "炼气一层",
+    cultivation: 0,
+    totalCultivation: 0,
+    required: 60,
+    progress: 0,
+    canBreakthrough: !1,
+    maxRealm: !1,
+    cultivating: !1,
+    gainPerSecond: 1,
+    offlineCapHours: 8,
+    events: [],
+  },
   ACTIVITIES = [
     { value: "idle", name: "待机", symbol: "◇", note: "闲立听风，静候道友。" },
     {
@@ -53,8 +67,20 @@ const DEFAULT_STATE = {
       items: ["灵植图录", "丹方考据", "法器收藏"],
     },
   };
+function formatEventTime(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? ""
+    : date.toLocaleTimeString("zh-CN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: !1,
+      });
+}
 function App() {
   const [N, el] = Ut.useState(DEFAULT_STATE),
+    [gameState, setGameState] = Ut.useState(DEFAULT_GAME_STATE),
+    [gameMessage, setGameMessage] = Ut.useState(""),
     [L, g] = Ut.useState("home"),
     [x, w] = Ut.useState(""),
     [Ml, Gl] = Ut.useState(!1),
@@ -64,7 +90,8 @@ function App() {
     Nl = Ut.useRef(0),
     jl = Ut.useRef(!0),
     Rl = !!window.desktop,
-    nl = ACTIVITIES.find((O) => O.value === N.activity) ?? ACTIVITIES[0];
+    nl = ACTIVITIES.find((O) => O.value === N.activity) ?? ACTIVITIES[0],
+    gamePercent = Math.round((gameState.progress ?? 0) * 100);
   Ut.useEffect(() => {
     jl.current = !0;
     const O = window.desktop;
@@ -91,6 +118,22 @@ function App() {
     }
     return () => {
       ((D = !1), (jl.current = !1), Xl == null || Xl());
+    };
+  }, []);
+  Ut.useEffect(() => {
+    const bridge = window.desktop;
+    if (!bridge?.getGameState || !bridge?.onGameState) return;
+    let active = !0;
+    const unsubscribe = bridge.onGameState((next) => {
+      active && setGameState(next);
+    });
+    bridge
+      .getGameState()
+      .then((next) => active && setGameState(next))
+      .catch(() => active && w("无法读取本地修炼存档。"));
+    return () => {
+      active = !1;
+      unsubscribe?.();
     };
   }, []);
   async function Hl(O, D) {
@@ -127,6 +170,24 @@ function App() {
   }
   async function rl(O, D) {
     p || (b(!0), await Hl(O, D), jl.current && b(!1));
+  }
+  async function runGameAction(action) {
+    const bridge = window.desktop;
+    if (p || !bridge?.gameCommand) return;
+    b(!0);
+    w("");
+    setGameMessage("");
+    try {
+      const result = await bridge.gameCommand(action);
+      if (jl.current) {
+        setGameState(result.state);
+        setGameMessage(result.message ?? "");
+      }
+    } catch {
+      jl.current && w("存档操作未完成，请检查文件后重试。");
+    } finally {
+      jl.current && b(!1);
+    }
   }
   function Pt(O) {
     O.button !== 0 ||
@@ -271,10 +332,10 @@ function App() {
             className: "prototype-banner",
             children: [
               s.jsx("span", { className: "status-dot" }),
-              "阶段 A · 本地原型",
+              "阶段 B · 本地修炼",
               s.jsx("span", {
                 className: "offline-label",
-                children: "服务器未接入",
+                children: "0.2 · 本地存档",
               }),
             ],
           }),
@@ -352,6 +413,79 @@ function App() {
                       ],
                     }),
                     s.jsxs("div", {
+                      className: "cultivation-overview",
+                      children: [
+                        s.jsxs("div", {
+                          className: "cultivation-summary",
+                          children: [
+                            s.jsxs("div", {
+                              children: [
+                                s.jsx("span", { children: "当前境界" }),
+                                s.jsx("strong", {
+                                  children: gameState.realmName,
+                                }),
+                              ],
+                            }),
+                            s.jsxs("div", {
+                              className: "cultivation-value",
+                              children: [
+                                s.jsx("b", {
+                                  children: gameState.cultivation,
+                                }),
+                                s.jsx("span", {
+                                  children:
+                                    gameState.required == null
+                                      ? "修为"
+                                      : ` / ${gameState.required}`,
+                                }),
+                              ],
+                            }),
+                          ],
+                        }),
+                        s.jsx("div", {
+                          className: "cultivation-track",
+                          role: "progressbar",
+                          "aria-label": "修为进度",
+                          "aria-valuemin": 0,
+                          "aria-valuemax": 100,
+                          "aria-valuenow": gamePercent,
+                          children: s.jsx("span", {
+                            style: { width: `${gamePercent}%` },
+                          }),
+                        }),
+                        s.jsxs("div", {
+                          className: "cultivation-meta",
+                          children: [
+                            s.jsx("span", {
+                              className: gameState.cultivating
+                                ? "cultivating"
+                                : "",
+                              children: gameState.cultivating
+                                ? `吐纳中 · +${gameState.gainPerSecond}/秒`
+                                : "修炼暂停 · 选择打坐开始吐纳",
+                            }),
+                            s.jsx("button", {
+                              className: "breakthrough-button",
+                              disabled:
+                                !Rl ||
+                                p ||
+                                !gameState.canBreakthrough ||
+                                gameState.maxRealm,
+                              onClick: () => void runGameAction("breakthrough"),
+                              children: gameState.maxRealm
+                                ? "已至炼气圆满"
+                                : "突破",
+                            }),
+                          ],
+                        }),
+                        gameMessage &&
+                          s.jsx("p", {
+                            className: "game-message",
+                            children: gameMessage,
+                          }),
+                      ],
+                    }),
+                    s.jsxs("div", {
                       className: "scene",
                       children: [
                         s.jsx("div", { className: "scene-moon" }),
@@ -389,7 +523,7 @@ function App() {
                       className: "activity-heading",
                       children: [
                         s.jsx("h2", { children: "修行日常" }),
-                        s.jsx("span", { children: "仅动作预览" }),
+                        s.jsx("span", { children: "打坐积累真实修为" }),
                       ],
                     }),
                     s.jsx("div", {
@@ -420,18 +554,39 @@ function App() {
                     }),
                     s.jsx("p", {
                       className: "activity-note",
-                      children: nl.note,
+                      children:
+                        N.activity === "meditate"
+                          ? `每秒获得 ${gameState.gainPerSecond} 点修为；离线收益最多 ${gameState.offlineCapHours} 小时。`
+                          : `${nl.note} 切换离开打坐会暂停修为增长。`,
                     }),
                     s.jsxs("div", {
-                      className: "honest-note",
+                      className: "cultivation-log",
                       children: [
-                        s.jsx("span", { children: "知" }),
-                        s.jsxs("p", {
+                        s.jsxs("div", {
+                          className: "cultivation-log-heading",
                           children: [
-                            "此处不计时、不产出修为或奖励。",
-                            s.jsx("br", {}),
-                            "真正的修行与存档，将在后续阶段接入。",
+                            s.jsx("strong", { children: "修行纪要" }),
+                            s.jsx("span", {
+                              children: `累计 ${gameState.totalCultivation} 修为`,
+                            }),
                           ],
+                        }),
+                        s.jsx("div", {
+                          className: "cultivation-events",
+                          children: gameState.events.slice(0, 3).map((entry) =>
+                            s.jsxs(
+                              "p",
+                              {
+                                children: [
+                                  s.jsx("time", {
+                                    children: formatEventTime(entry.at),
+                                  }),
+                                  s.jsx("span", { children: entry.text }),
+                                ],
+                              },
+                              entry.id,
+                            ),
+                          ),
                         }),
                       ],
                     }),
@@ -529,6 +684,39 @@ function App() {
                         }),
                       ],
                     }),
+                    s.jsxs("div", {
+                      className: "save-actions",
+                      children: [
+                        s.jsxs("div", {
+                          children: [
+                            s.jsx("strong", { children: "修炼存档" }),
+                            s.jsx("p", {
+                              children: "自动保存在本机，可另行导出备份。",
+                            }),
+                          ],
+                        }),
+                        s.jsxs("div", {
+                          className: "save-buttons",
+                          children: [
+                            s.jsx("button", {
+                              disabled: !Rl || p,
+                              onClick: () => void runGameAction("import"),
+                              children: "导入",
+                            }),
+                            s.jsx("button", {
+                              disabled: !Rl || p,
+                              onClick: () => void runGameAction("export"),
+                              children: "导出",
+                            }),
+                          ],
+                        }),
+                      ],
+                    }),
+                    gameMessage &&
+                      s.jsx("p", {
+                        className: "settings-message",
+                        children: gameMessage,
+                      }),
                     s.jsxs("button", {
                       className: "primary-button",
                       disabled: !vl || p,
@@ -609,7 +797,7 @@ function App() {
             className: "panel-footer",
             children: [
               s.jsx("span", { children: "尘途 · 与你共一段清闲" }),
-              s.jsx("span", { children: "LOCAL / A.01" }),
+              s.jsx("span", { children: "LOCAL / 0.2.0" }),
             ],
           }),
         ],

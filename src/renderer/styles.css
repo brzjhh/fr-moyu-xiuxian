@@ -238,6 +238,82 @@ svg {
   border-left: 1px solid #a7b07c33;
   padding-left: 9px;
 }
+.cultivation-overview {
+  padding: 11px 0 12px;
+  margin: -2px 0 14px;
+  border-top: 1px solid #a2b08824;
+  border-bottom: 1px solid #a2b08824;
+}
+.cultivation-summary,
+.cultivation-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cultivation-summary > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+.cultivation-summary span {
+  font-size: 9px;
+  color: #8fa58f;
+}
+.cultivation-summary strong {
+  font-family:
+    Songti SC,
+    SimSun,
+    serif;
+  font-size: 17px;
+  font-weight: 400;
+  color: #ded3a2;
+}
+.cultivation-value b {
+  font-size: 15px;
+  font-weight: 500;
+  color: #d8c584;
+}
+.cultivation-track {
+  height: 5px;
+  margin: 9px 0 8px;
+  overflow: hidden;
+  background: #0d29245c;
+  border: 1px solid #9baa8230;
+}
+.cultivation-track > span {
+  display: block;
+  height: 100%;
+  background: #c8b568;
+  transition: width 0.25s ease;
+}
+.cultivation-meta > span {
+  font-size: 9px;
+  color: #84998a;
+}
+.cultivation-meta > span.cultivating {
+  color: #b9c991;
+}
+.breakthrough-button {
+  min-width: 72px;
+  height: 27px;
+  border: 1px solid #bbaa6b66;
+  border-radius: 4px;
+  background: #65754835;
+  color: #ded09c;
+  font-size: 10px;
+}
+.breakthrough-button:disabled {
+  border-color: #8c9b8130;
+  background: transparent;
+  color: #74877b;
+}
+.game-message,
+.settings-message {
+  margin-top: 8px;
+  color: #d3c68e;
+  font-size: 9px;
+}
 .scene {
   height: 222px;
   position: relative;
@@ -453,6 +529,41 @@ svg {
   margin: 10px 0 13px;
   letter-spacing: 0.7px;
 }
+.cultivation-log {
+  padding: 10px 0 4px;
+  border-top: 1px solid #a2b08824;
+}
+.cultivation-log-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.cultivation-log-heading strong {
+  font-size: 10px;
+  font-weight: 500;
+  color: #bfc4a2;
+}
+.cultivation-log-heading span {
+  font-size: 8px;
+  color: #819789;
+}
+.cultivation-events {
+  min-height: 24px;
+}
+.cultivation-events p {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 7px;
+  margin: 5px 0;
+  font-size: 9px;
+  line-height: 1.5;
+  color: #94a58f;
+}
+.cultivation-events time {
+  color: #728b7e;
+  font-variant-numeric: tabular-nums;
+}
 .honest-note {
   display: flex;
   gap: 10px;
@@ -517,6 +628,38 @@ svg {
   background: #243e322f;
   margin-top: 20px;
   padding: 0 14px;
+}
+.save-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 2px;
+  margin-top: 14px;
+  border-top: 1px solid #a2b08824;
+  border-bottom: 1px solid #a2b08824;
+}
+.save-actions strong {
+  font-size: 11px;
+  font-weight: 500;
+}
+.save-actions p {
+  margin-top: 5px;
+  color: #879b8b;
+  font-size: 9px;
+}
+.save-buttons {
+  display: flex;
+  gap: 6px;
+}
+.save-buttons button {
+  height: 30px;
+  min-width: 52px;
+  border: 1px solid #a7b08044;
+  border-radius: 4px;
+  background: #2f4a3c80;
+  color: #c7c7a5;
+  font-size: 10px;
 }
 .setting-row {
   display: flex;

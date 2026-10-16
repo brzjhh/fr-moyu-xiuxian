@@ -11,4 +11,13 @@ electron_1.contextBridge.exposeInMainWorld("desktop", {
     return () =>
       electron_1.ipcRenderer.removeListener("desktop:updated", listener);
   },
+  getGameState: () => electron_1.ipcRenderer.invoke("game:state"),
+  gameCommand: (action) =>
+    electron_1.ipcRenderer.invoke("game:command", action),
+  onGameState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    electron_1.ipcRenderer.on("game:updated", listener);
+    return () =>
+      electron_1.ipcRenderer.removeListener("game:updated", listener);
+  },
 });
