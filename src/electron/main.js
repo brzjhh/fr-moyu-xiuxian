@@ -42,6 +42,7 @@ function ensureTray() {
   return result.status === 0 && after.width > 0 && after.height > 0;
 }
 const settings_1 = require("./settings");
+const cultivation_1 = require("./cultivation");
 const smoke = process.argv.includes("--smoke-test");
 if (smoke)
   electron_1.app.setPath(
@@ -56,11 +57,79 @@ let through = false;
 let quitting = false;
 let drag;
 let saveTimer;
+let game = (0, cultivation_1.createGameState)();
+let gameDirty = false;
+let gameTickTimer;
+let gameSaveTimer;
 const settingsPath = () =>
   node_path_1.default.join(
     electron_1.app.getPath("userData"),
     "desktop-settings.json",
   );
+const gamePath = () =>
+  node_path_1.default.join(
+    electron_1.app.getPath("userData"),
+    "cultivation-save.json",
+  );
+function writeJsonAtomic(file, value) {
+  node_fs_1.default.mkdirSync(node_path_1.default.dirname(file), {
+    recursive: true,
+  });
+  node_fs_1.default.writeFileSync(
+    file + ".tmp",
+    JSON.stringify(value, null, 2),
+  );
+  node_fs_1.default.renameSync(file + ".tmp", file);
+}
+function saveGame() {
+  try {
+    writeJsonAtomic(gamePath(), game);
+    gameDirty = false;
+  } catch (e) {
+    console.error("Cultivation save failed", e);
+  }
+}
+function settleGame(options) {
+  const result = (0, cultivation_1.settleGameState)(game, Date.now(), options);
+  game = result.state;
+  if (result.gained > 0) gameDirty = true;
+  return result;
+}
+function publicGameState() {
+  settleGame();
+  return (0, cultivation_1.toPublicGameState)(game);
+}
+function publishGame() {
+  if (win && !win.isDestroyed())
+    win.webContents.send("game:updated", publicGameState());
+}
+function loadGame() {
+  if (smoke) {
+    game = (0, cultivation_1.createGameState)(Date.now());
+    gameDirty = true;
+    return;
+  }
+  try {
+    game = (0, cultivation_1.normalizeGameState)(
+      JSON.parse(node_fs_1.default.readFileSync(gamePath(), "utf8")),
+    );
+  } catch (e) {
+    if (e && e.code !== "ENOENT") {
+      console.error("Cultivation load failed", e);
+      try {
+        node_fs_1.default.copyFileSync(
+          gamePath(),
+          `${gamePath()}.invalid-${Date.now()}.json`,
+        );
+      } catch (backupError) {
+        console.error("Invalid cultivation save backup failed", backupError);
+      }
+    }
+    game = (0, cultivation_1.createGameState)(Date.now());
+  }
+  settleGame({ recordOffline: true });
+  gameDirty = true;
+}
 function save() {
   try {
     node_fs_1.default.mkdirSync(electron_1.app.getPath("userData"), {
@@ -161,6 +230,14 @@ function command(action, value) {
       ) {
         settings.activity = value;
         save();
+        game = (0, cultivation_1.setCultivating)(
+          game,
+          value === "meditate",
+          Date.now(),
+        );
+        gameDirty = true;
+        saveGame();
+        publishGame();
       }
       break;
     case "top":
@@ -220,6 +297,57 @@ function command(action, value) {
   }
   publish();
   return state();
+}
+async function gameCommand(action) {
+  switch (action) {
+    case "breakthrough": {
+      const result = (0, cultivation_1.breakthrough)(game, Date.now());
+      game = result.state;
+      gameDirty = true;
+      saveGame();
+      publishGame();
+      return { state: publicGameState(), message: result.message };
+    }
+    case "export": {
+      settleGame();
+      saveGame();
+      const result = await electron_1.dialog.showSaveDialog(win, {
+        title: "导出尘途修仙存档",
+        defaultPath: "尘途修仙-青岚-存档.json",
+        filters: [{ name: "JSON 存档", extensions: ["json"] }],
+      });
+      if (result.canceled || !result.filePath)
+        return { state: publicGameState(), message: "已取消导出。" };
+      writeJsonAtomic(result.filePath, game);
+      return { state: publicGameState(), message: "存档已导出。" };
+    }
+    case "import": {
+      const result = await electron_1.dialog.showOpenDialog(win, {
+        title: "导入尘途修仙存档",
+        properties: ["openFile"],
+        filters: [{ name: "JSON 存档", extensions: ["json"] }],
+      });
+      if (result.canceled || !result.filePaths[0])
+        return { state: publicGameState(), message: "已取消导入。" };
+      const imported = (0, cultivation_1.importGameState)(
+        JSON.parse(node_fs_1.default.readFileSync(result.filePaths[0], "utf8")),
+      );
+      if (node_fs_1.default.existsSync(gamePath()))
+        node_fs_1.default.copyFileSync(
+          gamePath(),
+          `${gamePath()}.before-import.json`,
+        );
+      game = (0, cultivation_1.settleGameState)(imported, Date.now(), {
+        recordOffline: true,
+      }).state;
+      gameDirty = true;
+      saveGame();
+      publishGame();
+      return { state: publicGameState(), message: "存档已导入并完成结算。" };
+    }
+    default:
+      throw new Error("Unsupported game command");
+  }
 }
 function menuTemplate() {
   return [
@@ -303,6 +431,13 @@ if (!electron_1.app.requestSingleInstanceLock()) {
     } catch {
       settings = { ...settings_1.defaults };
     }
+    loadGame();
+    game = (0, cultivation_1.setCultivating)(
+      game,
+      settings.activity === "meditate",
+      Date.now(),
+    );
+    saveGame();
     win = new electron_1.BrowserWindow({
       width: 230,
       height: 270,
@@ -362,6 +497,15 @@ if (!electron_1.app.requestSingleInstanceLock()) {
         throw new Error("Invalid sender");
       return command(action, value);
     });
+    electron_1.ipcMain.handle("game:state", (event) => {
+      if (event.sender !== win.webContents) throw new Error("Invalid sender");
+      return publicGameState();
+    });
+    electron_1.ipcMain.handle("game:command", async (event, action) => {
+      if (event.sender !== win.webContents || typeof action !== "string")
+        throw new Error("Invalid sender");
+      return gameCommand(action);
+    });
     electron_1.screen.on("display-removed", recover);
     electron_1.screen.on("display-metrics-changed", recover);
     electron_1.powerMonitor.on("resume", () => {
@@ -398,6 +542,13 @@ if (!electron_1.app.requestSingleInstanceLock()) {
     await win.loadFile(
       node_path_1.default.join(__dirname, "../dist/index.html"),
     );
+    gameTickTimer = setInterval(() => {
+      const result = settleGame();
+      if (result.gained > 0) publishGame();
+    }, 1000);
+    gameSaveTimer = setInterval(() => {
+      if (gameDirty) saveGame();
+    }, 15000);
     setMode("pet");
     if (smoke) {
       try {
@@ -415,6 +566,10 @@ if (!electron_1.app.requestSingleInstanceLock()) {
     quitting = true;
     remember();
     if (saveTimer) clearTimeout(saveTimer);
+    if (gameTickTimer) clearInterval(gameTickTimer);
+    if (gameSaveTimer) clearInterval(gameSaveTimer);
+    settleGame();
+    saveGame();
     save();
   });
   electron_1.app.on("window-all-closed", () => {
@@ -437,6 +592,17 @@ async function runSmoke() {
     "window.desktop.getState()",
   );
   assert(bridged.mode === "pet", "renderer IPC state");
+  const initialGame = await win.webContents.executeJavaScript(
+    "window.desktop.getGameState()",
+  );
+  assert(initialGame.realmName === "炼气一层", "cultivation bridge");
+  command("activity", "meditate");
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  assert(publicGameState().cultivation >= 1, "cultivation tick");
+  assert(
+    node_fs_1.default.existsSync(gamePath()),
+    "cultivation save persisted",
+  );
   command("activity", "alchemy");
   command("top", true);
   assert(win.isAlwaysOnTop(), "top");
@@ -453,7 +619,7 @@ async function runSmoke() {
   assert(state().mode === "panel" && win.getSize()[0] === 440, "panel");
   assert(
     await win.webContents.executeJavaScript(
-      'document.body.innerText.includes("服务器未接入")',
+      'document.body.innerText.includes("本地存档")',
     ),
     "panel UI synchronized",
   );
@@ -526,6 +692,7 @@ async function runSmoke() {
         electron: process.versions.electron,
         checks: [
           "renderer/bridge",
+          "cultivation/persistence",
           "activity",
           "top",
           "scale",
