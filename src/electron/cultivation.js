@@ -684,7 +684,7 @@ function toPublicGameState(value, now = Date.now()) {
   };
 }
 
-module.exports = {
+const cultivationApi = {
   SAVE_VERSION,
   GAME_ID,
   GAIN_PER_SECOND,
@@ -710,3 +710,11 @@ module.exports = {
   breakthrough,
   toPublicGameState,
 };
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = cultivationApi;
+}
+
+if (typeof window !== "undefined") {
+  window.ChentuCultivation = cultivationApi;
+}

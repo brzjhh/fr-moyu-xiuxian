@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: chentu
+      POSTGRES_USER: chentu
+      POSTGRES_PASSWORD: chentu-local-only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chentu -d chentu"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - chentu_postgres_data:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_URL: postgresql://chentu:chentu-local-only@postgres:5432/chentu
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  chentu_postgres_data:

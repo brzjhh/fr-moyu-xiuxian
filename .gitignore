@@ -4,3 +4,6 @@ dist-electron/
 release/
 artifacts/
 local-preview-profile/
+.env
+server/dist/
+server/.env

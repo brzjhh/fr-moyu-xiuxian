@@ -1,18 +1,27 @@
 {
   "name": "chentu-desktop-recovered",
   "private": true,
-  "version": "0.3.0",
-  "description": "Recovered source project for the Chentu desktop prototype",
+  "version": "0.4.0",
+  "description": "Chentu cultivation web pet, Electron client, and server workspace",
+  "packageManager": "pnpm@11.25.0",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build --base=./ && node scripts/copy-electron.cjs",
+    "build:server": "pnpm --dir server build",
+    "ci": "pnpm test && pnpm --dir server test && pnpm build && pnpm --dir server build",
     "pack:from-release": "node scripts/package-from-release.cjs",
+    "pack:win": "node scripts/package-portable-win.cjs",
+    "server:dev": "pnpm --dir server dev",
+    "server:migrate": "pnpm --dir server migrate",
+    "server:start": "pnpm --dir server start",
     "start": "electron .",
     "start:diagnostic": "electron . --no-sandbox",
     "smoke": "electron . --smoke-test",
+    "smoke:web": "electron scripts/web-smoke.cjs",
     "smoke:diagnostic": "electron . --no-sandbox --smoke-test",
-    "test": "node --test tests/*.test.cjs"
+    "test": "node --test tests/*.test.cjs",
+    "test:server": "pnpm --dir server test"
   },
   "dependencies": {
     "react": "19.3.0",

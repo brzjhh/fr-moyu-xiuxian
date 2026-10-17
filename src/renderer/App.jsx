@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import Character from "./Character.jsx";
 
 const DEFAULT_DESKTOP_STATE = {
@@ -146,10 +147,17 @@ function App() {
   const [busy, setBusy] = React.useState(false);
   const [previewMenu, setPreviewMenu] = React.useState(false);
   const [now, setNow] = React.useState(Date.now());
+  const [pipWindow, setPipWindow] = React.useState(null);
+  const [installPrompt, setInstallPrompt] = React.useState(null);
   const pointer = React.useRef(null);
+  const pipWindowRef = React.useRef(null);
   const mounted = React.useRef(true);
   const commandSequence = React.useRef(0);
-  const isDesktop = Boolean(window.desktop);
+  const bridge = window.desktop;
+  const isDesktop = bridge?.platform !== "web";
+  const canPlay = Boolean(bridge?.gameCommand);
+  const supportsFloatingPet =
+    !isDesktop && "documentPictureInPicture" in window;
   const activity =
     ACTIVITIES.find((item) => item.value === desktopState.activity) ??
     ACTIVITIES[0];
@@ -163,6 +171,22 @@ function App() {
       window.clearInterval(timer);
     };
   }, []);
+
+  React.useEffect(() => {
+    if (isDesktop) return undefined;
+    const rememberPrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const clearPrompt = () => setInstallPrompt(null);
+    window.addEventListener("beforeinstallprompt", rememberPrompt);
+    window.addEventListener("appinstalled", clearPrompt);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", rememberPrompt);
+      window.removeEventListener("appinstalled", clearPrompt);
+      pipWindowRef.current?.close();
+    };
+  }, [isDesktop]);
 
   React.useEffect(() => {
     const bridge = window.desktop;
@@ -194,6 +218,66 @@ function App() {
     };
   }, []);
 
+  function preparePipDocument(targetWindow) {
+    targetWindow.document.title = "青岚 · 悬浮桌宠";
+    targetWindow.document.documentElement.lang = "zh-CN";
+    for (const node of document.head.querySelectorAll(
+      'style, link[rel="stylesheet"]',
+    )) {
+      const clone = node.cloneNode(true);
+      if (clone.tagName === "LINK") clone.href = node.href;
+      targetWindow.document.head.append(clone);
+    }
+    targetWindow.document.body.className = "pip-body";
+    const root = targetWindow.document.createElement("div");
+    root.id = "pip-root";
+    targetWindow.document.body.append(root);
+    return root;
+  }
+
+  async function openFloatingPet() {
+    if (!supportsFloatingPet) return false;
+    if (pipWindowRef.current && !pipWindowRef.current.closed) {
+      pipWindowRef.current.focus();
+      return true;
+    }
+    try {
+      const targetWindow = await window.documentPictureInPicture.requestWindow({
+        width: Math.round(230 * desktopState.scale),
+        height: Math.round(300 * desktopState.scale),
+      });
+      preparePipDocument(targetWindow);
+      pipWindowRef.current = targetWindow;
+      setPipWindow(targetWindow);
+      targetWindow.addEventListener(
+        "pagehide",
+        () => {
+          pipWindowRef.current = null;
+          if (mounted.current) setPipWindow(null);
+        },
+        { once: true },
+      );
+      return true;
+    } catch {
+      if (mounted.current)
+        setError("浏览器未能打开悬浮桌宠，已切换到页面桌宠模式。");
+      return false;
+    }
+  }
+
+  function closeFloatingPet() {
+    pipWindowRef.current?.close();
+    pipWindowRef.current = null;
+    setPipWindow(null);
+  }
+
+  async function installWebApp() {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  }
+
   React.useEffect(() => {
     const bridge = window.desktop;
     if (!bridge?.getGameState || !bridge?.onGameState) return;
@@ -214,6 +298,10 @@ function App() {
   async function desktopCommand(actionName, value) {
     setError("");
     const bridge = window.desktop;
+    if (actionName === "mode" && value === "pet" && !isDesktop) {
+      const opened = await openFloatingPet();
+      if (opened) return desktopState;
+    }
     if (!bridge) {
       setDesktopState((current) => {
         switch (actionName) {
@@ -385,22 +473,34 @@ function App() {
           disabled={!ready || busy}
           onClick={() => runDesktopCommand("mode", "pet")}
         >
-          桌宠 ↗
+          {isDesktop ? "桌宠 ↗" : "召唤 ↗"}
         </button>
-        <button
-          className="window-action icon-action"
-          aria-label="隐藏到托盘"
-          title="隐藏到托盘"
-          disabled={!ready || busy}
-          onClick={() => runDesktopCommand("hide")}
-        >
-          −
-        </button>
+        {isDesktop ? (
+          <button
+            className="window-action icon-action"
+            aria-label="隐藏到托盘"
+            title="隐藏到托盘"
+            disabled={!ready || busy}
+            onClick={() => runDesktopCommand("hide")}
+          >
+            −
+          </button>
+        ) : (
+          installPrompt && (
+            <button
+              className="window-action"
+              onClick={installWebApp}
+              title="将尘途安装为独立网页应用"
+            >
+              安装
+            </button>
+          )
+        )}
       </header>
 
       <div className="prototype-banner">
         <span className="status-dot" />
-        <span>本地单人存档</span>
+        <span>{isDesktop ? "本地单人存档" : "网页自动存档"}</span>
         <span className="offline-label">
           {gameState.mainTask === "meditate"
             ? "吐纳中"
@@ -431,7 +531,9 @@ function App() {
       <section className="panel-content">
         {!isDesktop && (
           <div className="browser-note">
-            浏览器仅展示界面，修炼与存档操作需要 Electron。
+            {supportsFloatingPet
+              ? "网页修炼与本地存档已启用；点击“召唤”可打开始终置顶的悬浮桌宠。"
+              : "网页修炼与本地存档已启用；当前浏览器不支持悬浮窗，将使用页面桌宠模式。"}
           </div>
         )}
         {error && <div className="error-banner">{error}</div>}
@@ -443,7 +545,7 @@ function App() {
             gameState={gameState}
             activity={activity}
             busy={busy}
-            isDesktop={isDesktop}
+            isDesktop={canPlay}
             mainTaskBusy={mainTaskBusy}
             onActivity={(value) => runDesktopCommand("activity", value)}
             onBreakthrough={() => runGameAction("breakthrough")}
@@ -455,7 +557,7 @@ function App() {
             gameState={gameState}
             now={now}
             busy={busy}
-            isDesktop={isDesktop}
+            isDesktop={canPlay}
             onAction={runGameAction}
           />
         )}
@@ -465,7 +567,7 @@ function App() {
             gameState={gameState}
             now={now}
             busy={busy}
-            isDesktop={isDesktop}
+            isDesktop={canPlay}
             onAction={runGameAction}
           />
         )}
@@ -474,7 +576,7 @@ function App() {
           <InventoryPage
             gameState={gameState}
             busy={busy}
-            isDesktop={isDesktop}
+            isDesktop={canPlay}
             onAction={runGameAction}
           />
         )}
@@ -483,7 +585,9 @@ function App() {
           <SettingsPage
             desktopState={desktopState}
             busy={busy}
-            isDesktop={isDesktop}
+            isDesktop={canPlay}
+            isElectron={isDesktop}
+            supportsFloatingPet={supportsFloatingPet}
             onDesktopAction={runDesktopCommand}
             onGameAction={runGameAction}
           />
@@ -492,8 +596,40 @@ function App() {
 
       <footer className="panel-footer">
         <span>尘途 · 与你共一段清闲</span>
-        <span>LOCAL / 0.3.0</span>
+        <span>{isDesktop ? "LOCAL" : "WEB"} / 0.4.0</span>
       </footer>
+      {pipWindow?.document.getElementById("pip-root") &&
+        createPortal(
+          <FloatingWebPet
+            desktopState={desktopState}
+            gameState={gameState}
+            activity={activity}
+            onOpen={closeFloatingPet}
+          />,
+          pipWindow.document.getElementById("pip-root"),
+        )}
+    </main>
+  );
+}
+
+function FloatingWebPet({ desktopState, gameState, activity, onOpen }) {
+  return (
+    <main
+      className="pet-mode web-floating-pet"
+      style={{ "--pet-scale": desktopState.scale }}
+    >
+      <div className="pet-drag-surface">
+        <Character
+          activity={desktopState.activity}
+          paused={!desktopState.animation}
+        />
+        <div className="pet-caption">
+          {gameState.characterName} · {activity.name} · {gameState.realmName}
+        </div>
+      </div>
+      <button className="pet-open" onClick={onOpen} aria-label="返回洞府">
+        入府 ↗
+      </button>
     </main>
   );
 }
@@ -890,6 +1026,8 @@ function SettingsPage({
   desktopState,
   busy,
   isDesktop,
+  isElectron,
+  supportsFloatingPet,
   onDesktopAction,
   onGameAction,
 }) {
@@ -901,20 +1039,38 @@ function SettingsPage({
         chapter="伍 · 设置"
       />
       <div className="settings-card">
-        <SettingRow
-          title="始终置顶"
-          note="让小修士陪在其他窗口之上"
-          checked={desktopState.alwaysOnTop}
-          disabled={busy}
-          onChange={(value) => onDesktopAction("top", value)}
-        />
-        <SettingRow
-          title="鼠标穿透"
-          note="仅桌宠模式可用，请通过托盘恢复"
-          checked={desktopState.clickThrough}
-          disabled
-          onChange={(value) => onDesktopAction("through", value)}
-        />
+        {isElectron ? (
+          <>
+            <SettingRow
+              title="始终置顶"
+              note="让小修士陪在其他窗口之上"
+              checked={desktopState.alwaysOnTop}
+              disabled={busy}
+              onChange={(value) => onDesktopAction("top", value)}
+            />
+            <SettingRow
+              title="鼠标穿透"
+              note="仅桌宠模式可用，请通过托盘恢复"
+              checked={desktopState.clickThrough}
+              disabled
+              onChange={(value) => onDesktopAction("through", value)}
+            />
+          </>
+        ) : (
+          <div className="setting-row">
+            <div>
+              <strong>浏览器悬浮桌宠</strong>
+              <p>
+                {supportsFloatingPet
+                  ? "当前浏览器支持始终置顶的小窗"
+                  : "当前浏览器仅支持页面内桌宠"}
+              </p>
+            </div>
+            <span className="setting-value">
+              {supportsFloatingPet ? "可用" : "不支持"}
+            </span>
+          </div>
+        )}
         <div className="setting-row scale-setting">
           <div>
             <strong>桌宠尺寸</strong>
@@ -938,8 +1094,11 @@ function SettingsPage({
 
       <div className="save-actions">
         <div>
-          <strong>本地修炼存档 v2</strong>
-          <p>自动保存，可导入 v0.2 旧存档并迁移。</p>
+          <strong>{isElectron ? "本地" : "网页"}修炼存档 v2</strong>
+          <p>
+            自动保存，可导入 v0.2 旧存档
+            {!isElectron && "，也可与桌面版互相迁移"}。
+          </p>
         </div>
         <div className="save-buttons">
           <button
@@ -962,18 +1121,28 @@ function SettingsPage({
         disabled={busy}
         onClick={() => onDesktopAction("mode", "pet")}
       >
-        <span>◇ 返回透明桌宠</span>
+        <span>◇ {isElectron ? "返回透明桌宠" : "召唤悬浮桌宠"}</span>
         <span>↗</span>
       </button>
       <div className="settings-help">
         <h2>陪伴的小秘诀</h2>
-        <p>
-          拖动小修士移动窗口，单击进入洞府。
-          <br />
-          右键打开菜单；鼠标穿透后请用托盘恢复。
-          <br />
-          炼丹和历练是主任务，药园则会独立生长。
-        </p>
+        {isElectron ? (
+          <p>
+            拖动小修士移动窗口，单击进入洞府。
+            <br />
+            右键打开菜单；鼠标穿透后请用托盘恢复。
+            <br />
+            炼丹和历练是主任务，药园则会独立生长。
+          </p>
+        ) : (
+          <p>
+            悬浮桌宠需要保持洞府网页开启。
+            <br />
+            浏览器负责悬浮窗的位置和边框；点击“入府”即可返回。
+            <br />
+            修炼进度会自动保存在当前浏览器中。
+          </p>
+        )}
       </div>
     </>
   );

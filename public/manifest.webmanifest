@@ -1,0 +1,20 @@
+{
+  "name": "尘途修仙 · 青岚洞府",
+  "short_name": "尘途修仙",
+  "description": "可以直接在网页中修炼和召唤悬浮桌宠的放置修仙游戏。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d201d",
+  "theme_color": "#122b27",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

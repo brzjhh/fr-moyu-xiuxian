@@ -20,6 +20,20 @@ body {
   margin: 0;
   background: transparent;
 }
+
+html[data-platform="web"] body {
+  min-width: 320px;
+  background: #0d201d;
+}
+
+html[data-platform="web"] .palace {
+  min-height: 660px;
+  border-radius: 0;
+  box-shadow:
+    0 18px 55px #06110e99,
+    inset 0 0 0 5px #142d28,
+    inset 0 0 0 6px #a9944c15;
+}
 button {
   font: inherit;
   color: inherit;
@@ -901,6 +915,43 @@ svg {
 .pet-mode:hover .pet-open,
 .pet-open:focus-visible {
   opacity: 1;
+}
+
+.pip-body,
+.pip-body #pip-root {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #102822;
+}
+
+.web-floating-pet {
+  background:
+    radial-gradient(ellipse at 50% 72%, #4d735b55, transparent 58%), #102822;
+}
+
+.web-floating-pet .pet-drag-surface {
+  cursor: default;
+}
+
+.web-floating-pet .pet-caption,
+.web-floating-pet .pet-open {
+  opacity: 1;
+}
+
+.web-floating-pet .pet-caption {
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 601px) {
+  html[data-platform="web"] .palace {
+    border-left: 1px solid #b59d6140;
+    border-right: 1px solid #b59d6140;
+  }
 }
 .pet-preview {
   position: absolute;

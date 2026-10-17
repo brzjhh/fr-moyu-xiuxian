@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "codex/**"
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  client:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+
+  server:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: chentu
+          POSTGRES_USER: chentu
+          POSTGRES_PASSWORD: chentu-ci
+        options: >-
+          --health-cmd "pg_isready -U chentu -d chentu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://chentu:chentu-ci@127.0.0.1:5432/chentu
+      HOST: 127.0.0.1
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter @chentu/server...
+      - run: pnpm --dir server test
+      - run: pnpm --dir server build
+      - run: pnpm --dir server migrate

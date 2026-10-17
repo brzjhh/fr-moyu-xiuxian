@@ -1,6 +1,31 @@
-# 尘途修仙：源码恢复工程
+# 尘途修仙
 
-本工程由 Windows 阶段 A 运行包反推恢复，现已在恢复界面上继续开发本地单人玩法。当前目录是可编辑的 React/Electron 源码工程，不是丢失前文件的逐字还原。
+本工程由 Windows 阶段 A 运行包反推恢复，现已继续开发为可直接使用浏览器游玩的 React 网页、可安装 PWA、Electron 桌宠客户端和 Fastify 服务端工作区。当前目录不是丢失前文件的逐字还原。
+
+## 网页与悬浮桌宠
+
+- 浏览器版本拥有完整的本地修炼循环，存档自动写入当前浏览器的 `localStorage`。
+- Chrome、Edge 等支持 Document Picture-in-Picture 的桌面浏览器可点击“召唤”，打开始终置顶的悬浮桌宠小窗。
+- 不支持悬浮窗的浏览器会自动退回页面桌宠模式，不影响修炼和存档。
+- 网页存档可导出为 JSON，并可与 Electron 客户端的 v1/v2 存档互相导入。
+- PWA manifest 和 service worker 已启用；浏览器提供安装入口时，可直接安装为独立网页应用。
+- `.github/workflows/pages.yml` 会在 `main` 更新后构建并发布 GitHub Pages，也可从 Actions 页面手动触发。
+
+本地运行网页版本：
+
+```powershell
+pnpm install
+pnpm dev
+```
+
+打开 `http://127.0.0.1:5173/`。生产构建与网页 smoke：
+
+```powershell
+pnpm build
+pnpm smoke:web
+```
+
+悬浮桌宠需要 HTTPS 或 `127.0.0.1`，并且必须由用户点击“召唤”打开。关闭主网页后，浏览器会同时关闭悬浮桌宠。
 
 ## 0.3 本地洞府循环
 
@@ -14,7 +39,7 @@
 - 主进程将修炼状态原子写入 Electron 用户数据目录，渲染页面不能直接读写文件。
 - 存档升级为 v2，同时兼容导入 v0.2 的 v1 存档；导入时会校验身份和版本、清理异常字段，并在覆盖前保留旧存档副本。
 
-当前仍不包含账号、服务器、云同步、多人玩法、装备、宗门或服务端权威结算。本版资源与计时均为本地单人规则。
+当前仍不包含账号接口、云同步、多人玩法、装备、宗门或服务端权威结算。网页和 Electron 的资源与计时目前均为本地单人规则。
 
 ## 恢复范围
 
@@ -41,6 +66,7 @@ pnpm install
 pnpm build
 pnpm test
 pnpm smoke
+pnpm smoke:web
 ```
 
 `pnpm start` 使用 Electron 的正常沙盒启动。原运行包在原机器上曾有正常启动提前退出的问题；仅在受信任的本地原型环境下，可用 `pnpm start:diagnostic` 传入 `--no-sandbox` 诊断。这个命令不适合联网发布。
@@ -53,8 +79,30 @@ node scripts/package-from-release.cjs "C:\Users\Administrator\Desktop\尘途修�
 
 此命令创建 `release/recovered-win`，不会修改原运行包，也不会复制其中的用户配置。新目录包含现有运行时、重新构建的界面和桌面代码，以及原来的诊断启动器。
 
-运行包中的托盘修复依赖 Electron 35.7.5 的 Windows 内部实现。升级 Electron 前需要复核并重新测试。当前工程有本地修炼存档，但不含服务端、账号、云同步或多人游戏逻辑。
+运行包中的托盘修复依赖 Electron 35.7.5 的 Windows 内部实现。升级 Electron 前需要复核并重新测试。当前工程包含服务端基础和本地修炼存档，但尚未开放账号、云同步或多人游戏接口。
+
+## v0.4 服务端基础
+
+服务端代码位于 `server/`，当前包含 Fastify、PostgreSQL 连接、顺序数据库迁移以及 `/health` 健康检查。数据库初始结构为邀请码、用户、角色、角色资源和幂等请求预留表；注册、登录和游戏写入接口尚未实现。
+
+安装工作区依赖并运行服务端测试：
+
+```powershell
+pnpm install
+pnpm test:server
+pnpm build:server
+```
+
+已安装 Docker 的机器可以在仓库根目录运行：
+
+```powershell
+docker compose up --build
+```
+
+服务启动后访问 `http://127.0.0.1:3000/health`。详细本地开发方式见 [服务端说明](server/README.md)。
+
+`.github/workflows/ci.yml` 会分别验证 Windows 客户端和带 PostgreSQL 的 Linux 服务端。`.github/workflows/pages.yml` 负责网页发布。未来推送新的 `v*` 标签时，`.github/workflows/release.yml` 会运行测试、生成 Windows x64 免安装 ZIP、计算 SHA-256，并上传到对应 GitHub Release。现有标签不会因新增工作流自动重新触发。
 
 ## 本次验证
 
-Windows x64、Node.js 24.19.0、Electron 35.7.5 环境下，生产构建、15 项单元测试和正常沙盒原生 smoke 均通过。smoke 覆盖渲染桥接、v2 存档、药田命令、修为增长与落盘、洞府/历练/行囊页面、动作、置顶、缩放、穿透、洞府/桌宠切换、托盘隐藏恢复和屏外位置恢复。导出文件对话框在 v0.2 已人工生成有效 JSON；Mac、长期运行、真实多屏拔插以及 v2 导入导出的完整人工往返仍需实机验收。
+Windows x64、Node.js 24.19.0、Electron 35.7.5 环境下，生产构建、15 项单元测试、正常沙盒原生 smoke 和无 preload 网页 smoke 均通过。网页 smoke 覆盖网页桥接、启用状态、修炼计时、药田操作、`localStorage` 落盘、模拟悬浮窗口中的 React 桌宠渲染以及悬浮调用失败时的页面回退；生产截图已目视检查。真实 Chrome/Edge 系统悬浮小窗和 PWA 安装仍需部署后人工验收。Mac、长期运行、真实多屏拔插以及 v2 导入导出的完整人工往返仍需实机验收。

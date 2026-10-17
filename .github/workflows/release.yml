@@ -1,0 +1,51 @@
+name: Release Windows Test Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.25.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm --dir server test
+      - run: pnpm build
+      - run: pnpm --dir server build
+      - name: Build portable Windows directory
+        shell: pwsh
+        run: |
+          $env:RELEASE_VERSION = "${{ github.ref_name }}"
+          pnpm pack:win
+      - name: Create ZIP and checksum
+        shell: pwsh
+        run: |
+          $name = "Chentu-Xiuxian-${{ github.ref_name }}-win-x64"
+          Compress-Archive -Path "release/$name" -DestinationPath "release/$name.zip"
+          $hash = (Get-FileHash "release/$name.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $name.zip" | Set-Content "release/$name.zip.sha256" -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-${{ github.ref_name }}
+          path: |
+            release/Chentu-Xiuxian-${{ github.ref_name }}-win-x64.zip
+            release/Chentu-Xiuxian-${{ github.ref_name }}-win-x64.zip.sha256
+      - uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            release/Chentu-Xiuxian-${{ github.ref_name }}-win-x64.zip
+            release/Chentu-Xiuxian-${{ github.ref_name }}-win-x64.zip.sha256

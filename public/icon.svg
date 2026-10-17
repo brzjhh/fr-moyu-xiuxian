@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="尘途修仙">
+  <rect width="512" height="512" rx="92" fill="#122b27"/>
+  <rect x="76" y="76" width="360" height="360" rx="42" fill="none" stroke="#cbbb7b" stroke-width="12"/>
+  <rect x="98" y="98" width="316" height="316" rx="28" fill="none" stroke="#657548" stroke-width="4"/>
+  <text x="256" y="324" fill="#e2d29b" font-family="serif" font-size="210" text-anchor="middle">尘</text>
+</svg>
