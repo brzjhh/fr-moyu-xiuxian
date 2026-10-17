@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "pnpm build && node --watch dist/index.js",
     "dev:compile": "tsc -p tsconfig.json --watch",
+    "invite:create": "pnpm build && node dist/create-invite.js",
     "migrate": "pnpm build && node dist/migrate.js",
     "migrate:prod": "node dist/migrate.js",
     "start": "node dist/index.js",

@@ -56,6 +56,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile --filter @chentu/server...
-      - run: pnpm --dir server test
       - run: pnpm --dir server build
       - run: pnpm --dir server migrate
+      - run: pnpm --dir server test

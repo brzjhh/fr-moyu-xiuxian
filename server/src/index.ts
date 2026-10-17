@@ -4,7 +4,7 @@ import { createDatabase } from "./database.js";
 
 const config = loadConfig();
 const database = createDatabase(config.databaseUrl);
-const app = buildApp({ checkDatabase: database.check, logger: true });
+const app = buildApp({ store: database, logger: true });
 
 let closing = false;
 async function shutdown(signal: string) {

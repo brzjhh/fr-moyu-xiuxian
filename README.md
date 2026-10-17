@@ -83,7 +83,7 @@ node scripts/package-from-release.cjs "C:\Users\Administrator\Desktop\尘途修�
 
 ## v0.4 服务端基础
 
-服务端代码位于 `server/`，当前包含 Fastify、PostgreSQL 连接、顺序数据库迁移以及 `/health` 健康检查。数据库初始结构为邀请码、用户、角色、角色资源和幂等请求预留表；注册、登录和游戏写入接口尚未实现。
+服务端代码位于 `server/`，当前包含 Fastify、PostgreSQL 连接、顺序数据库迁移、邀请码注册、密码登录、Bearer 会话和带版本冲突保护的云存档 API。数据库保存密码的 `scrypt` 哈希以及邀请码、会话令牌的 SHA-256 摘要，不保存这些凭据的明文。客户端账号界面、自动同步、接口限流和服务端权威修炼结算仍待实现。
 
 安装工作区依赖并运行服务端测试：
 
